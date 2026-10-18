@@ -4,7 +4,9 @@ Wearable full-face plague doctor mask for costume use, parametric in FreeCAD,
 printed in PLA on a 220 x 220 mm bed. Style parts (beaks, eye bezels, trims)
 are swappable on one base mask.
 
-Status: **pre-design**. Nothing modelled yet; waiting on face measurements.
+Status: **first parametric model** built from typical adult face values
+(`mask.py`, MAIN table). Replace them with your measurements, rebuild, then
+print the fit tests. Only the minimal style exists so far.
 
 ## Requirements (agreed 2026-10-18)
 
@@ -37,6 +39,28 @@ Status: **pre-design**. Nothing modelled yet; waiting on face measurements.
 A style setting in the build script chooses which beak, bezels and trims to
 export.
 
+## Files
+
+| File | Role |
+|------|------|
+| `mask.py` | Builds everything: parameters at the top (MAIN = face measurements, ADVANCED = design), then stages `shell`, `eyes`, `beak`, `slots`, `checks`, `save`, `tests` |
+| `PlagueMask.FCStd` | Shell, beak, lens rings, plain bezel, transparent face reference, Params sheet (display only; edit `mask.py`) |
+| `PlagueMaskTests.FCStd` | Fit frame and coupons |
+| `stl/mask_*.stl` | Shell (prints back edge down, needs supports under the front), beak (base down), lens ring, mesh ring, disc cutting template, plain bezel |
+| `stl/test_mask_*.stl` | Fit frame, eye socket, beak socket + beak base, strap slot |
+
+## Current model (default values)
+
+- Shell 168 x 165 x 130 mm, 151 g; beak 177 mm, 47 g, one piece (splits
+  automatically above `BeakPiece`).
+- Lenses sit 20.5 mm in front of the eyes; eye opening 38 mm.
+- Beak socket sits 40 mm below the pupils, between the eye sockets; a hump
+  in the shell clears the nose bridge by 6 mm.
+- Vents: 4 beak slots (2 on top, 2 hidden underneath), 308 mm2, plus the
+  open lower edge of the mask.
+- Checks: no overlap with the face, nose or eyelash zone; eye inserts and beak
+  snap into their sockets without overlap.
+
 ## Face measurements needed
 
 Take these with a ruler or calipers, in mm (a friend helps). Relaxed face,
@@ -44,7 +68,7 @@ looking straight ahead.
 
 | # | Name | How to measure |
 |---|------|----------------|
-| 1 | Face width | Widest point across the cheekbones |
+| 1 | Face width (`FaceW`) | Widest point across the cheekbones |
 | 2 | Temple width | Across the sides of the head at eye level, just in front of the ears |
 | 3 | Face length | Eyebrow line to bottom of the chin |
 | 4 | Eye spacing | Centre of one pupil to the other (your glasses prescription may list it as PD) |
