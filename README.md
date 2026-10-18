@@ -6,6 +6,7 @@ with its own scripts, FreeCAD models, STLs and docs.
 | Project | Description | Status |
 |---------|-------------|--------|
 | [tophat](tophat/) | Parametric top hat with a hidden cage for storage and IoT devices | Test prints (round 1) |
+| [plaguemask](plaguemask/) | Wearable full-face plague doctor mask with swappable beaks, eye inserts and trims | Pre-design (needs face measurements) |
 
 ## Conventions
 
