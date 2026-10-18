@@ -1,0 +1,15 @@
+# FreeCAD automatic backups
+*.FCBak
+*.FCStd1
+
+# Python
+__pycache__/
+*.pyc
+
+# Slicer output (keep STLs, not machine-specific G-code)
+*.gcode
+*.bgcode
+*.3mf.tmp
+
+# macOS
+.DS_Store
