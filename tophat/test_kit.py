@@ -51,6 +51,7 @@ A0, B0, CA, CB = val("A0"), val("B0"), val("CA"), val("CB")
 FONT = "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
 BrimW, BrimT, CollarH, BandH = val("BrimW"), val("BrimT"), val("CollarH"), val("BandH")
 CrownH, Wall, LipH, CageT = val("CrownH"), val("Wall"), val("LipH"), val("CageT")
+CapT = val("CapT")
 
 
 def oval(a, b, za, zb):
@@ -186,7 +187,7 @@ def cage_part(model, obj):
     return o.Shape if o else None
 
 
-z_top = CrownH - Wall
+z_top = CrownH - CapT
 lip_ring = add(FIX, "lip_ring", hat.Crown.Shape.common(
     band(val("LipBotA") - CageT - 6, val("LipBotB") - CageT - 6, CA * val("Flare") + Wall + 2,
          CB * val("Flare") + Wall + 2, z_top - LipH - 1, CrownH + 1)),

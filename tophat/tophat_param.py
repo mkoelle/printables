@@ -4,7 +4,13 @@ Parts: Crown, Hatband, BrimQ1..BrimQ<BrimSegs> (brim segments). The
 interior cage (CageFingers) is built by cage.py from these Params.
 - Head size comes from SIZE below (a preset or a measured circumference).
 - Wall thicknesses are whole nozzle perimeters (Nozzle, WallPerims).
+- Crown wall is JointT at the brim (snap, ribs) and tapers to Wall at the
+  hatband top, so the thick joint zone stays hidden under the band.
 - Brim is flat beside the crown and curls up at the sides (Curl, FlatW).
+  A binding band (RimW, RimT) stands proud round its outer edge, ending
+  square to the sheet (also on the curls) with a rounded top (RimR) and a
+  printable bottom chamfer (RimChamfer). The band is swept in Python when
+  this script runs, like the segment count.
 - Brim is cut into the fewest segments (a multiple of 4) that fit Bed;
   segments join with dovetail keys at each seam; keys follow the curl.
 - Brim carries an inner collar; the crown slides over it and seats on the brim.
@@ -13,6 +19,7 @@ count is fixed when this script runs, so rerun it after size or Bed changes.
 """
 import math
 import FreeCAD as App
+import Part
 
 # Head circumference presets, mm round the forehead. SIZE is a preset name or
 # a measured circumference in mm. XXL's crown needs a bed over 220 mm.
@@ -36,14 +43,20 @@ main = [
     ("BrimW",    "65 mm",  "Brim width beyond head opening"),
     ("Curl",     "25 mm",  "Brim side curl height at outer edge (> 0)"),
     ("Nozzle",   "0.4 mm", "Nozzle diameter; vertical walls are whole perimeters of it"),
-    ("WallPerims", "7",    "Crown wall perimeters (Wall = Nozzle * WallPerims)"),
+    ("WallPerims", "4",    "Crown wall perimeters above the hatband (Wall = Nozzle * WallPerims)"),
     ("Clr",      "0.2 mm", "Print clearance for all fits (tune per printer)"),
     ("Bed",      "220 mm", "Square print bed size; sets the brim segment count"),
 ]
 advanced = [
-    ("BrimT",     "Wall + 1 mm",       "Brim thickness"),
-    ("CollarT",   "Nozzle * round(WallPerims * 2 / 3)", "Brim collar wall thickness (inside crown), whole perimeters"),
-    ("CollarH",   "3 * BrimT",         "Brim collar height above brim"),
+    ("JointPerims", "7",               "Crown wall perimeters at the brim joint (JointT), under the hatband"),
+    ("CapT",      "1.6 mm",            "Crown top cap thickness (printed on the bed)"),
+    ("BrimT",     "1.6 mm",            "Brim thickness (8 layers at 0.2 mm, as cad_tophat)"),
+    ("RimW",      "6 mm",              "Edge binding band width (like a grosgrain-bound brim)"),
+    ("RimT",      "1.2 mm",            "Edge binding height above the brim top face"),
+    ("RimR",      "1.6 mm",            "Edge binding: outer top rounding radius"),
+    ("RimChamfer", "0.6 mm",           "Edge binding: outer bottom 45 deg chamfer (prints on the bed)"),
+    ("CollarT",   "Nozzle * round(JointPerims * 2 / 3)", "Brim collar wall thickness (inside crown), whole perimeters"),
+    ("CollarH",   "12 mm",             "Brim collar height above brim"),
     ("BandH",     "CrownH / 5",        "Hatband height"),
     ("BandT",     "Nozzle * 3",        "Hatband thickness, 3 perimeters"),
     ("Ease",      "5 mm",              "Fit allowance added to circumference"),
@@ -51,10 +64,10 @@ advanced = [
     ("KeyNeck",   "BrimW * 0.15",      "Dovetail neck width (at seam)"),
     ("KeyHead",   "KeyNeck * 1.6",     "Dovetail head width"),
     ("KeyDepth",  "KeyNeck * 0.8",     "Dovetail depth past seam"),
-    ("RibR",      "Wall * 0.4",        "Alignment rib height (into crown wall slot)"),
+    ("RibR",      "0.8 mm",            "Alignment rib height (into crown wall slot)"),
     ("RibW",      "6 mm",              "Alignment rib width"),
     ("RibWFront", "RibW + 4 mm",       "Wide front-right rib (sets crown orientation)"),
-    ("Snap",      "Wall * 0.2",        "Snap ridge height on collar"),
+    ("Snap",      "JointT * 0.2",      "Snap ridge height on collar"),
     ("SnapH",     "Snap * 5",          "Snap ridge height along Z"),
     ("HeadClear", "90 mm",             "Top of head above brim underside (from the head gauge)"),
     ("HeadGap",   "10 mm",             "Space kept between the head and cage rails/sliders"),
@@ -65,7 +78,8 @@ advanced = [
     ("LipLead",   "1 mm",              "Lip lead-in: clearance to the finger tips at the lip bottom"),
 ]
 derived = [
-    ("Wall", "Nozzle * WallPerims", "Crown wall thickness; other thicknesses scale from it"),
+    ("Wall", "Nozzle * WallPerims", "Crown wall thickness above the hatband"),
+    ("JointT", "Nozzle * JointPerims", "Crown wall thickness at the brim; joint parts scale from it"),
     ("Ka", "pi * (3 * (1 + Oval) - sqrt((3 + Oval) * (1 + 3 * Oval)))",
            "Ellipse perimeter factor: P = a * Ka (Ramanujan)"),
     ("A0", "(HeadCirc + Ease) / Ka", "Head opening half-length (front/back)"),
@@ -73,19 +87,21 @@ derived = [
     ("CA", "A0 + CollarT + Clr",     "Crown inner half-length at base"),
     ("CB", "B0 + CollarT + Clr",     "Crown inner half-width at base"),
     ("HatSizeUS", "(HeadCirc / 25.4 mm) / pi", "US hat size (inches / pi)"),
-    ("CrownTopA", "(CA + Wall) * Flare", "Crown top outer half-length"),
-    ("CrownTopB", "(CB + Wall) * Flare", "Crown top outer half-width"),
+    ("BandS", "1 + (Flare - 1) * (BandH - CollarH - 1 mm) / (CrownH - CapT - BrimT - CollarH - 1 mm)",
+              "Crown inner scale at the hatband top (wall reaches Wall there)"),
+    ("CrownTopA", "CA * Flare + Wall", "Crown top outer half-length"),
+    ("CrownTopB", "CB * Flare + Wall", "Crown top outer half-width"),
     ("CrownFit45", "2 * sqrt((CrownTopA ^ 2 + CrownTopB ^ 2) / 2)",
                    "Crown footprint turned 45 deg on bed"),
-    ("CurlY0", "CB + Wall + Clr + BandT + FlatW", "Curl starts at |y| beyond this"),
+    ("CurlY0", "CB + JointT + Clr + BandT + FlatW", "Curl starts at |y| beyond this"),
     ("CurlD",  "B0 + BrimW - CurlY0",       "Curl run from start to side edge"),
     ("CurlR",  "(CurlD ^ 2 + Curl ^ 2) / (2 * Curl)", "Curl arc radius"),
     ("BrimSegs", "4", "Brim segments: fewest multiple of 4 that fit Bed (set by tophat_param.py)"),
     ("CageZ0", "BrimT + CollarH",           "Cage bottom (rests on collar top)"),
-    ("CageZ1", "CrownH - Wall - Clr",       "Cage top (just under crown top)"),
-    ("LipS0",  "1 + (Flare - 1) * (CrownH - Wall - LipH - BrimT - CollarH - 1 mm) / (CrownH - Wall - BrimT - CollarH - 1 mm)",
+    ("CageZ1", "CrownH - CapT - Clr",       "Cage top (just under crown top)"),
+    ("LipS0",  "1 + (Flare - 1) * (CrownH - CapT - LipH - BrimT - CollarH - 1 mm) / (CrownH - CapT - BrimT - CollarH - 1 mm)",
                "Crown inner scale at the lip bottom"),
-    ("LipS1",  "1 + (Flare - 1) * (CrownH - Wall - 0.6 * LipH - BrimT - CollarH - 1 mm) / (CrownH - Wall - BrimT - CollarH - 1 mm)",
+    ("LipS1",  "1 + (Flare - 1) * (CrownH - CapT - 0.6 * LipH - BrimT - CollarH - 1 mm) / (CrownH - CapT - BrimT - CollarH - 1 mm)",
                "Crown inner scale where the press band starts"),
     ("LipMidA", "CA * LipS1 - CageT + LipPress", "Wedge lip outer half-length where the press band starts"),
     ("LipMidB", "CB * LipS1 - CageT + LipPress", "Wedge lip outer half-width where the press band starts"),
@@ -147,7 +163,7 @@ else:
 sh.set(sh.getCellFromAlias("BrimSegs"), f"={N}")
 doc.recompute()
 crown_fit = val("CrownFit45")
-print(f"size {SIZE} ({val('HeadCirc'):.0f} mm), Wall {val('Wall'):.2f} mm, "
+print(f"size {SIZE} ({val('HeadCirc'):.0f} mm), Wall {val('Wall'):.2f} / joint {val('JointT'):.2f} mm, "
       f"brim {N} segments ({side:.1f} mm each on a {bed:.0f} mm bed), crown at 45 deg "
       f"{crown_fit:.1f} mm" + ("" if crown_fit <= bed else " DOES NOT FIT the bed"))
 
@@ -187,36 +203,40 @@ def rot_z(deg):
 P = "Params."
 
 # --- Crown: open bottom, seats on brim top, slides over collar ------------
+# Outer wall: JointT thick at the brim, tapering to Wall at the hatband top,
+# then Wall thick up to the cap. The taper hides under the hatband.
 z0 = f"{P}BrimT"
+z_band = f"{P}BrimT + {P}BandH"
 outer = loft("CrownOuter", [
-    ellipse("OuterBot", f"{P}CA + {P}Wall", f"{P}CB + {P}Wall", z0),
+    ellipse("OuterBot", f"{P}CA + {P}JointT", f"{P}CB + {P}JointT", z0),
+    ellipse("OuterBand", f"{P}CA * {P}BandS + {P}Wall", f"{P}CB * {P}BandS + {P}Wall", z_band),
     ellipse("OuterTop", f"{P}CrownTopA", f"{P}CrownTopB", f"{P}CrownH"),
 ])
+outer.Ruled = True
 # Inner wall stays straight over the collar so the snap fit keeps its grip
 inner = loft("CrownInner", [
     ellipse("InnerBot", f"{P}CA", f"{P}CB", f"{P}BrimT - 1 mm"),
     ellipse("InnerMid", f"{P}CA", f"{P}CB", f"{P}BrimT + {P}CollarH + 1 mm"),
     ellipse("InnerTop", f"{P}CA * {P}Flare", f"{P}CB * {P}Flare",
-            f"{P}CrownH - {P}Wall"),
+            f"{P}CrownH - {P}CapT"),
 ])
 inner.Ruled = True
 crown_body = boolean("Cut", "CrownBody", outer, inner)
 
-# --- Hatband: follows crown flare, Clr gap inside, BandT thick -----------
+# --- Hatband: follows the crown's outer taper, Clr gap inside, BandT thick -
 # Slides on from the crown's narrow bottom end before the crown meets the
 # brim; gravity seats it on the brim top.
-def scale_at(z):
-    return f"(1 + ({P}Flare - 1) * (({z}) - {P}BrimT) / ({P}CrownH - {P}BrimT))"
+zb, zt = z0, z_band
 
-zb, zt = f"{P}BrimT", f"{P}BrimT + {P}BandH"
 
 def band_loft(name, offset):
-    return loft(name, [
-        ellipse(f"{name}Bot", f"({P}CA + {P}Wall) * {scale_at(zb)} + {offset}",
-                f"({P}CB + {P}Wall) * {scale_at(zb)} + {offset}", zb),
-        ellipse(f"{name}Top", f"({P}CA + {P}Wall) * {scale_at(zt)} + {offset}",
-                f"({P}CB + {P}Wall) * {scale_at(zt)} + {offset}", zt),
+    l = loft(name, [
+        ellipse(f"{name}Bot", f"{P}CA + {P}JointT + {offset}", f"{P}CB + {P}JointT + {offset}", zb),
+        ellipse(f"{name}Top", f"{P}CA * {P}BandS + {P}Wall + {offset}",
+                f"{P}CB * {P}BandS + {P}Wall + {offset}", zt),
     ])
+    l.Ruled = True
+    return l
 
 band_outer = band_loft("BandOuter", f"{P}Clr + {P}BandT")
 band_inner = band_loft("BandInner", f"{P}Clr")
@@ -242,25 +262,72 @@ def x_cylinder(name, radius):
     c.setExpression(".Placement.Base.z", f"{P}CurlR")
     return c
 
-flat = box("BrimFlat", "600 mm", f"2 * {P}CurlY0", f"{P}BrimT",
-           "-300 mm", f"-{P}CurlY0", "0 mm")
-tube = boolean("Cut", "CurlTube", x_cylinder("CurlOuterCyl", f"{P}CurlR"),
-               x_cylinder("CurlInnerCyl", f"{P}CurlR - {P}BrimT"))
-curl_clip = box("CurlClip", "600 mm", f"{P}CurlR", f"{P}CurlR + 1 mm",
-                "-300 mm", f"{P}CurlY0", "-1 mm")
-curl_pos = boolean("Common", "CurlPos", tube, curl_clip)
-curl_neg = doc.addObject("Part::Mirroring", "CurlNeg")
-curl_neg.Source = curl_pos
-curl_neg.Normal = App.Vector(0, 1, 0)
-sheet = doc.addObject("Part::MultiFuse", "BrimSheet")
-sheet.Shapes = [flat, curl_pos, curl_neg]
-sheet.Refine = True
+def brim_sheet(name, thick):
+    """Flat centre band plus both curls, `thick` up from the brim underside."""
+    flat = box(f"{name}Flat", "600 mm", f"2 * {P}CurlY0", thick,
+               "-300 mm", f"-{P}CurlY0", "0 mm")
+    tube = boolean("Cut", f"{name}Tube", x_cylinder(f"{name}OuterCyl", f"{P}CurlR"),
+                   x_cylinder(f"{name}InnerCyl", f"{P}CurlR - ({thick})"))
+    clip = box(f"{name}Clip", "600 mm", f"{P}CurlR", f"{P}CurlR + 1 mm",
+               "-300 mm", f"{P}CurlY0", "-1 mm")
+    pos = boolean("Common", f"{name}CurlPos", tube, clip)
+    neg = doc.addObject("Part::Mirroring", f"{name}CurlNeg")
+    neg.Source = pos
+    neg.Normal = App.Vector(0, 1, 0)
+    sheet = doc.addObject("Part::MultiFuse", name)
+    sheet.Shapes = [flat, pos, neg]
+    sheet.Refine = True
+    return sheet
+
+sheet = brim_sheet("BrimSheet", f"{P}BrimT")
 
 # --- Brim ring with collar ------------------------------------------------
-brim_prism = extrude("BrimPrism", ellipse("BrimEdge", f"{P}A0 + {P}BrimW",
-                                          f"{P}B0 + {P}BrimW", "-1 mm"),
+# the sheet stops inside the edge binding, which carries the true edge
+brim_prism = extrude("BrimPrism", ellipse("BrimEdge", f"{P}A0 + {P}BrimW - {P}RimW / 3",
+                                          f"{P}B0 + {P}BrimW - {P}RimW / 3", "-1 mm"),
                      f"{P}Curl + {P}BrimT + 10 mm")
 brim_disc = boolean("Common", "BrimDisc", sheet, brim_prism)
+
+
+# --- Edge binding ---------------------------------------------------------
+# Profile in (s, h): s along the sheet, outward (0 = brim edge), h along the
+# sheet normal (0 = underside). Swept round the edge with the profile square
+# to the sheet, so the curls end square instead of in a vertical knife cut.
+def binding():
+    a, b = val("A0") + val("BrimW"), val("B0") + val("BrimW")
+    y0, R = val("CurlY0"), val("CurlR")
+    bt, rt, rw = val("BrimT"), val("RimT"), val("RimW")
+    r, c, t = val("RimR"), val("RimChamfer"), val("BrimT") + val("RimT")
+
+    def arc(cx, cy, rad, a0, a1, n):
+        return [(cx + rad * math.cos(math.radians(a0 + (a1 - a0) * i / n)),
+                 cy + rad * math.sin(math.radians(a0 + (a1 - a0) * i / n))) for i in range(n + 1)]
+    prof = ([(-rw, 0.0)] + arc(-rw + rt, bt, rt, 180, 90, 6)
+            + arc(-r, t - r, r, 90, 0, 8) + [(0.0, c), (-c, 0.0)])
+
+    def station(u_t):
+        x, y = a * math.cos(u_t), b * math.sin(u_t)
+        dy = abs(y) - y0
+        if dy > 0:  # on a curl: underside height and sheet normal
+            sphi = dy / R
+            z = R - math.sqrt(R * R - dy * dy)
+            n = App.Vector(0, -math.copysign(sphi, y), math.sqrt(1 - sphi * sphi))
+        else:
+            z, n = 0.0, App.Vector(0, 0, 1)
+        nh = App.Vector(math.cos(u_t) / a, math.sin(u_t) / b, 0)
+        nh.normalize()
+        out = nh - n * nh.dot(n)
+        out.normalize()
+        q = App.Vector(x, y, z)
+        pts = [q + out * s_ + n * h for s_, h in prof]
+        return Part.makePolygon(pts + [pts[0]])
+
+    k = 160
+    return Part.makeLoft([station(2 * math.pi * i / k) for i in range(k)], True, True, True)
+
+
+rim = doc.addObject("Part::Feature", "Rim")
+rim.Shape = binding()
 collar = extrude("CollarSolid", ellipse("CollarEdge", f"{P}A0 + {P}CollarT",
                                         f"{P}B0 + {P}CollarT", "0 mm"),
                  f"{P}BrimT + {P}CollarH")
@@ -322,7 +389,7 @@ crown_cut = boolean("Cut", "CrownCut", crown_body, crown_tool)
 # the crown on the brim drives the lip down inside the tips and presses them
 # flat to the wall. Prints on the inner face (crown prints top-down), so
 # nothing shows outside.
-lip_zb = f"({P}CrownH - {P}Wall - {P}LipH)"
+lip_zb = f"({P}CrownH - {P}CapT - {P}LipH)"
 lip_zm = f"({lip_zb} + 0.4 * {P}LipH)"
 
 
@@ -331,7 +398,7 @@ def lip_loft(name, inset, ext):
     secs = [ellipse(f"{name}Bot", f"{P}LipBotA - {inset}", f"{P}LipBotB - {inset}", f"{lip_zb} - {ext}"),
             ellipse(f"{name}Mid", f"{P}LipMidA - {inset}", f"{P}LipMidB - {inset}", lip_zm),
             ellipse(f"{name}Top", f"{P}LipTopA - {inset}", f"{P}LipTopB - {inset}",
-                    f"{P}CrownH - {P}Wall + {ext} + 0.5 mm")]
+                    f"{P}CrownH - {P}CapT + {ext} + 0.5 mm")]
     l = loft(name, secs)
     l.Ruled = True
     return l
@@ -345,7 +412,7 @@ crown.Shapes = [crown_cut, lip]
 crown.Refine = True
 
 brim_solid = doc.addObject("Part::MultiFuse", "BrimSolid")
-brim_solid.Shapes = [brim_disc, collar, ridge] + ribs
+brim_solid.Shapes = [brim_disc, rim, collar, ridge] + ribs
 brim_ring = boolean("Cut", "BrimRing", brim_solid, brim_hole)
 
 # --- Dovetail keys --------------------------------------------------------

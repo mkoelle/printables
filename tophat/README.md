@@ -65,14 +65,28 @@ and `test_kit.py`).
 - **6 rails**, evenly spaced, starting front and back. Rails stop `HeadGap`
   above a dome model of the head, so they run lower at the sides than the top
   of the head (`HeadClear`).
-- **Vertical walls are whole perimeters** (`Wall`, `CollarT`, `BandT` =
-  `Nozzle` x a count), so the slicer never leaves gaps or overlaps. Default
-  wall is 7 x 0.4 = 2.8 mm.
+- **Vertical walls are whole perimeters** (`Wall`, `JointT`, `CollarT`,
+  `BandT` = `Nozzle` x a count), so the slicer never leaves gaps or overlaps.
+- **Thin crown, thick joint.** The crown wall is `JointT` (7 x 0.4 = 2.8 mm)
+  at the brim, where the snap groove and rib slots cut into it, and tapers
+  to `Wall` (4 x 0.4 = 1.6 mm) at the hatband top. The taper hides under
+  the hatband, which follows it. Top cap `CapT` 1.6 mm, rib slots 0.8 mm
+  deep. Crown is 258 g (454 g with a 2.8 mm wall everywhere).
 - **Brim segment count is automatic:** the fewest multiple of 4 whose pieces
   fit `Bed`. Multiples of 4 keep seams on both axes (symmetric pieces, and
   the dovetail test coupons stay valid). The crown is never cut (snap
   groove and lip run round it); `tophat_param.py` warns when it does not
   fit, as at XXL on a 220 mm bed.
+- **Thin brim with a bound edge.** `BrimT` 1.6 mm (8 layers), as in
+  cad_tophat, where a brim this thin held its shape. A binding band `RimW`
+  6 mm wide stands `RimT` 1.2 mm proud round the whole outer edge, like the
+  grosgrain binding on a real top hat. Its profile is swept square to the
+  sheet, so the curls end square rather than in the knife edge a vertical
+  cut leaves; the top is rounded (`RimR` 1.6 mm), the bottom has a 45 deg
+  chamfer (`RimChamfer`) that prints cleanly on the bed. No bulging bead:
+  that reads as a bowler or costume hat, not a top hat. Brim is 129 g
+  (264 g at 3.8 mm). `CollarH` is a fixed 12 mm so the snap joint does not
+  follow `BrimT`.
 - **Wedge lip** under the crown top: lead-in taper then a press band that
   squeezes finger tips `LipPress` against the wall (anti-rattle).
 
