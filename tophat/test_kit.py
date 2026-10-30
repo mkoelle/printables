@@ -39,13 +39,14 @@ sys.path.insert(0, DIR)
 import rail
 importlib.reload(rail)
 
-BED = 220.0
 if "TopHat" not in App.listDocuments():
     App.openDocument(os.path.join(DIR, "TopHat.FCStd"))
 hat = App.getDocument("TopHat")
 hat.recompute()
 sh = hat.Params
 val = lambda n: getattr(getattr(sh, n), "Value", getattr(sh, n))
+BED = val("Bed")
+SEGS = int(val("BrimSegs"))  # a multiple of 4: seams on both axes
 A0, B0, CA, CB = val("A0"), val("B0"), val("CA"), val("CB")
 FONT = "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
 BrimW, BrimT, CollarH, BandH = val("BrimW"), val("BrimT"), val("CollarH"), val("BandH")
@@ -167,8 +168,8 @@ crown_ring = add(FIX, "crown_ring", hat.Crown.Shape.common(
 pairs.append((FIX, "collar_ring/crown_ring", collar, crown_ring))
 
 tiles = {
-    "dovetail_flat": (box(A0 + 8, A0 + BrimW + 1, -25, 25, -5, 60), "BrimQ4", "BrimQ1"),
-    "dovetail_curl": (box(-25, 25, B0 + 8, B0 + BrimW + 1, -5, 60), "BrimQ1", "BrimQ2"),
+    "dovetail_flat": (box(A0 + 8, A0 + BrimW + 1, -25, 25, -5, 60), f"BrimQ{SEGS}", "BrimQ1"),
+    "dovetail_curl": (box(-25, 25, B0 + 8, B0 + BrimW + 1, -5, 60), f"BrimQ{SEGS // 4}", f"BrimQ{SEGS // 4 + 1}"),
 }
 for name, (clip, tongue_part, socket_part) in tiles.items():
     t = add(FIX, f"{name}_tongue", hat.getObject(tongue_part).Shape.common(clip))

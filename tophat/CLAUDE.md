@@ -26,9 +26,11 @@ change, confirm:
 
 - all parts `valid True solids 1`;
 - overlaps 0, except the wedge lip / finger press, which is intended;
-- `fits=True` (220 mm bed);
+- `fits=True` (`Bed`, 220 mm by default);
 - rails show no head-dome overlap;
-- for hat-wide changes, rerun at `HeadCirc` 550 and 610 mm, then reset to 570.
+- for hat-wide changes, rerun at `SIZE` "S" and "XL", then reset to "M";
+- `tophat_param.py` prints the brim segment count and crown fit; it must not
+  say `DOES NOT FIT` for the size you print.
 
 ## FreeCAD gotchas found in this project
 

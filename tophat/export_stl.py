@@ -1,8 +1,9 @@
 """Export print-ready STLs from the open TopHat document.
 
-Each part is placed for a square bed (BED): lowest point at z=0,
+Each part is placed for the square bed in Params.Bed: lowest point at z=0,
 centred on the origin. Crown is flipped (top on bed); crown and hatband are
-turned 45 deg so their long oval fits the bed diagonal.
+turned 45 deg so their long oval fits the bed diagonal; each brim segment is
+turned to its smallest footprint.
 Writes to <document folder>/stl/.
 """
 import os
@@ -12,7 +13,8 @@ import MeshPart
 doc = App.getDocument("TopHat")
 out = os.path.join(os.path.dirname(doc.FileName), "stl")
 os.makedirs(out, exist_ok=True)
-BED = 220.0  # printer bed size, mm (square)
+BED = doc.Params.Bed.Value  # printer bed size, mm (square)
+SEGS = int(doc.Params.BrimSegs)
 
 def place(shape, flip=False, turn=0):
     s = shape.copy()
@@ -24,8 +26,19 @@ def place(shape, flip=False, turn=0):
     s.translate(App.Vector(-bb.Center.x, -bb.Center.y, -bb.ZMin))
     return s
 
+
+
+def best_turn(shape):
+    """Turn (deg) giving the smallest square footprint. Uses
+    optimalBoundingBox: the loose BoundBox misjudges the curled segments."""
+    def side(t):
+        bb = place(shape, turn=t).optimalBoundingBox()
+        return max(bb.XLength, bb.YLength)
+    return min(range(0, 180, 2), key=side)
+
+
 jobs = [("Crown", True, 45), ("Hatband", False, 45)] + \
-       [(f"BrimQ{q}", False, 0) for q in range(1, 5)]
+       [(f"BrimQ{q}", False, best_turn(doc.getObject(f"BrimQ{q}").Shape)) for q in range(1, SEGS + 1)]
 for name, flip, turn in jobs:
     s = place(doc.getObject(name).Shape, flip, turn)
     mesh = MeshPart.meshFromShape(Shape=s, LinearDeflection=0.05,

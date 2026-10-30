@@ -1,13 +1,24 @@
 """Parametric top hat, split into printable parts.
 
-Parts: Crown, Hatband, BrimQ1..BrimQ4 (brim quadrants). The interior
-cage (CageFingers) is built by cage.py from these Params.
+Parts: Crown, Hatband, BrimQ1..BrimQ<BrimSegs> (brim segments). The
+interior cage (CageFingers) is built by cage.py from these Params.
+- Head size comes from SIZE below (a preset or a measured circumference).
+- Wall thicknesses are whole nozzle perimeters (Nozzle, WallPerims).
 - Brim is flat beside the crown and curls up at the sides (Curl, FlatW).
-- Brim quadrants join with dovetail keys at each seam; keys follow the curl.
+- Brim is cut into the fewest segments (a multiple of 4) that fit Bed;
+  segments join with dovetail keys at each seam; keys follow the curl.
 - Brim carries an inner collar; the crown slides over it and seats on the brim.
-Edit the Main section of the Params spreadsheet and recompute.
+Edit the Main section of the Params spreadsheet and recompute. The segment
+count is fixed when this script runs, so rerun it after size or Bed changes.
 """
+import math
 import FreeCAD as App
+
+# Head circumference presets, mm round the forehead. SIZE is a preset name or
+# a measured circumference in mm. XXL's crown needs a bed over 220 mm.
+SIZES = {"XS": 530, "S": 550, "M": 570, "L": 590, "XL": 610, "XXL": 630}
+SIZE = "M"
+HEAD_CIRC = float(SIZES.get(SIZE, SIZE))
 
 if "TopHat" in App.listDocuments():
     App.closeDocument("TopHat")
@@ -18,21 +29,23 @@ doc = App.newDocument("TopHat")
 # with a plain value if needed). Derived: computed geometry, do not edit.
 sh = doc.addObject("Spreadsheet::Sheet", "Params")
 main = [
-    ("HeadCirc", "570 mm", "Head circumference (S 550, M 570, L 590, XL 610)"),
+    ("HeadCirc", f"{HEAD_CIRC:g} mm", f"Head circumference (size {SIZE}; set SIZE in tophat_param.py)"),
     ("Oval",     "0.8",    "Head width/length ratio (0.75 long oval .. 0.85 round)"),
     ("CrownH",   "150 mm", "Total hat height (brim bottom to crown top)"),
     ("Flare",    "1.06",   "Crown top scale vs base"),
     ("BrimW",    "65 mm",  "Brim width beyond head opening"),
     ("Curl",     "25 mm",  "Brim side curl height at outer edge (> 0)"),
-    ("Wall",     "3 mm",   "Crown wall thickness; other thicknesses scale from it"),
+    ("Nozzle",   "0.4 mm", "Nozzle diameter; vertical walls are whole perimeters of it"),
+    ("WallPerims", "7",    "Crown wall perimeters (Wall = Nozzle * WallPerims)"),
     ("Clr",      "0.2 mm", "Print clearance for all fits (tune per printer)"),
+    ("Bed",      "220 mm", "Square print bed size; sets the brim segment count"),
 ]
 advanced = [
     ("BrimT",     "Wall + 1 mm",       "Brim thickness"),
-    ("CollarT",   "Wall * 2 / 3",      "Brim collar wall thickness (inside crown)"),
+    ("CollarT",   "Nozzle * round(WallPerims * 2 / 3)", "Brim collar wall thickness (inside crown), whole perimeters"),
     ("CollarH",   "3 * BrimT",         "Brim collar height above brim"),
     ("BandH",     "CrownH / 5",        "Hatband height"),
-    ("BandT",     "1 mm",              "Hatband thickness"),
+    ("BandT",     "Nozzle * 3",        "Hatband thickness, 3 perimeters"),
     ("Ease",      "5 mm",              "Fit allowance added to circumference"),
     ("FlatW",     "6 mm",              "Flat brim margin beside crown before curl"),
     ("KeyNeck",   "BrimW * 0.15",      "Dovetail neck width (at seam)"),
@@ -52,6 +65,7 @@ advanced = [
     ("LipLead",   "1 mm",              "Lip lead-in: clearance to the finger tips at the lip bottom"),
 ]
 derived = [
+    ("Wall", "Nozzle * WallPerims", "Crown wall thickness; other thicknesses scale from it"),
     ("Ka", "pi * (3 * (1 + Oval) - sqrt((3 + Oval) * (1 + 3 * Oval)))",
            "Ellipse perimeter factor: P = a * Ka (Ramanujan)"),
     ("A0", "(HeadCirc + Ease) / Ka", "Head opening half-length (front/back)"),
@@ -66,8 +80,7 @@ derived = [
     ("CurlY0", "CB + Wall + Clr + BandT + FlatW", "Curl starts at |y| beyond this"),
     ("CurlD",  "B0 + BrimW - CurlY0",       "Curl run from start to side edge"),
     ("CurlR",  "(CurlD ^ 2 + Curl ^ 2) / (2 * Curl)", "Curl arc radius"),
-    ("BrimQX", "A0 + BrimW + KeyDepth", "Brim quadrant footprint X"),
-    ("BrimQY", "B0 + BrimW + KeyDepth", "Brim quadrant footprint Y"),
+    ("BrimSegs", "4", "Brim segments: fewest multiple of 4 that fit Bed (set by tophat_param.py)"),
     ("CageZ0", "BrimT + CollarH",           "Cage bottom (rests on collar top)"),
     ("CageZ1", "CrownH - Wall - Clr",       "Cage top (just under crown top)"),
     ("LipS0",  "1 + (Flare - 1) * (CrownH - Wall - LipH - BrimT - CollarH - 1 mm) / (CrownH - Wall - BrimT - CollarH - 1 mm)",
@@ -91,6 +104,52 @@ for title, items in (("Main", main), ("Advanced", advanced), ("Derived", derived
         sh.setAlias(f"B{row}", alias)
     row += 2
 doc.recompute()
+val = lambda n: getattr(getattr(sh, n), "Value", getattr(sh, n))
+
+
+# --- Brim segment count ---------------------------------------------------
+def ray(a, b, phi):
+    """Distance from the centre to ellipse (a, b) along polar angle phi (deg)."""
+    c, s = math.cos(math.radians(phi)), math.sin(math.radians(phi))
+    return a * b / math.hypot(b * c, a * s)
+
+
+def segment_side(n, k):
+    """Smallest square (any turn on the bed) holding brim segment k of n."""
+    a0, b0, w = val("A0"), val("B0"), val("BrimW")
+    p0, p1 = 360 * k / n, 360 * (k + 1) / n
+    pts = []
+    for i in range(41):
+        phi = p0 + (p1 - p0) * i / 40
+        for r in (ray(a0, b0, phi), ray(a0 + w, b0 + w, phi)):
+            pts.append((r * math.cos(math.radians(phi)), r * math.sin(math.radians(phi))))
+    # dovetail tongue reaching KeyDepth past the end seam
+    c, s = math.cos(math.radians(p1)), math.sin(math.radians(p1))
+    mid = (ray(a0, b0, p1) + val("CollarT") + ray(a0 + w, b0 + w, p1)) / 2
+    for r in (mid - val("KeyHead") / 2, mid + val("KeyHead") / 2):
+        pts.append((r * c - val("KeyDepth") * s, r * s + val("KeyDepth") * c))
+    best = math.inf
+    for turn in range(0, 180, 2):
+        tc, ts = math.cos(math.radians(turn)), math.sin(math.radians(turn))
+        xs = [x * tc - y * ts for x, y in pts]
+        ys = [x * ts + y * tc for x, y in pts]
+        best = min(best, max(max(xs) - min(xs), max(ys) - min(ys)))
+    return best
+
+
+bed = val("Bed")
+for N in (4, 8, 12, 16):
+    side = max(segment_side(N, k) for k in range(N))
+    if side <= bed:
+        break
+else:
+    raise ValueError(f"brim needs more than 16 segments for a {bed:.0f} mm bed")
+sh.set(sh.getCellFromAlias("BrimSegs"), f"={N}")
+doc.recompute()
+crown_fit = val("CrownFit45")
+print(f"size {SIZE} ({val('HeadCirc'):.0f} mm), Wall {val('Wall'):.2f} mm, "
+      f"brim {N} segments ({side:.1f} mm each on a {bed:.0f} mm bed), crown at 45 deg "
+      f"{crown_fit:.1f} mm" + ("" if crown_fit <= bed else " DOES NOT FIT the bed"))
 
 # --- Geometry helpers -----------------------------------------------------
 def ellipse(name, major, minor, z):
@@ -243,7 +302,7 @@ def snap_ring(name, grow):
     l.Ruled = True
     return l
 
-rib_angles = [45, 135, 225, 315]  # one per quadrant Q1..Q4
+rib_angles = [(k + 0.5) * 360 / N for k in range(N)]  # one per segment, mid-arc
 ribs, slots = [], []
 for q, t in enumerate(rib_angles, start=1):
     width = f"{P}RibWFront" if q == 1 else f"{P}RibW"
@@ -290,14 +349,20 @@ brim_solid.Shapes = [brim_disc, collar, ridge] + ribs
 brim_ring = boolean("Cut", "BrimRing", brim_solid, brim_hole)
 
 # --- Dovetail keys --------------------------------------------------------
-# Seam k lies on the ray at k*90 deg. Wedge local frame: X = radial along seam,
-# Y = across seam (neck at Y=0, head at Y=KeyDepth), Z = thickness.
-# Seam k tongue belongs to quadrant k (CCW owner) and enters quadrant k+1.
+# Seam k lies on the ray at k*360/N deg. Wedge local frame: X = radial along
+# seam, Y = across seam (neck at Y=0, head at Y=KeyDepth), Z = thickness.
+# Seam k tongue belongs to segment k (CCW owner) and enters segment k+1.
+def ray_expr(a, b, phi):
+    return f"({a}) * ({b}) / sqrt((({b}) * cos({phi})) ^ 2 + (({a}) * sin({phi})) ^ 2)"
+
+
 def key(name, seam, grow, z_lo, z_hi):
-    radius = f"{P}A0" if seam % 2 == 0 else f"{P}B0"
-    mid = f"({radius} + {P}CollarT + ({P}BrimW - {P}CollarT) / 2)"
+    phi = seam * 360 / N
+    r_in = ray_expr(f"{P}A0", f"{P}B0", phi)
+    r_out = ray_expr(f"{P}A0 + {P}BrimW", f"{P}B0 + {P}BrimW", phi)
+    mid = f"(({r_in}) + {P}CollarT + ({r_out})) / 2"
     w = doc.addObject("Part::Wedge", name)
-    w.Placement = rot_z(seam * 90)
+    w.Placement = rot_z(phi)
     w.setExpression("Ymin", f"-1 mm - {grow}")
     w.setExpression("Ymax", f"{P}KeyDepth + {grow}")
     w.setExpression("Xmin", f"{mid} - {P}KeyNeck / 2 - {grow}")
@@ -309,14 +374,13 @@ def key(name, seam, grow, z_lo, z_hi):
     return w
 
 pieces = []
-for q in range(1, 5):
-    box = doc.addObject("Part::Box", f"QuadBox{q}")
-    box.Length = box.Width = 600
-    box.Height = 300
-    box.Placement = App.Placement(App.Vector(), App.Rotation(App.Vector(0, 0, 1), (q - 1) * 90))
-    box.Placement.Base = box.Placement.Rotation.multVec(App.Vector(0, 0, -100))
-    quad = boolean("Common", f"BrimQ{q}Base", brim_ring, box)
-    owned, incoming = q % 4, q - 1  # seam indices
+for q in range(1, N + 1):
+    sector = doc.addObject("Part::Cylinder", f"SegSector{q}")
+    sector.Radius, sector.Height, sector.Angle = 400, 300, 360 / N
+    sector.Placement = App.Placement(App.Vector(0, 0, -100),
+                                     App.Rotation(App.Vector(0, 0, 1), (q - 1) * 360 / N))
+    quad = boolean("Common", f"BrimQ{q}Base", brim_ring, sector)
+    owned, incoming = q % N, q - 1  # seam indices
     # Keys are tall prisms clipped to the brim, so they follow the curl
     z_top = f"{P}Curl + {P}BrimT + 2 mm"
     tongue = boolean("Common", f"Key{q}", brim_ring,

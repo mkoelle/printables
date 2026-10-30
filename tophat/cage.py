@@ -31,7 +31,6 @@ sys.path.insert(0, DIR)
 import rail
 importlib.reload(rail)
 
-BED = 220.0
 RAIL_COUNT = 6                     # 6: front, back + 4 at 60 deg steps
 RAIL_T = [k * 360 / RAIL_COUNT for k in range(RAIL_COUNT)]  # ellipse parameters
 FINGER_W = rail.BASE_W + 8         # finger width
@@ -43,6 +42,7 @@ hat = App.getDocument("TopHat")
 hat.recompute()
 sh = hat.Params
 val = lambda n: getattr(getattr(sh, n), "Value", getattr(sh, n))
+BED = val("Bed")
 CA, CB, Clr, T = val("CA"), val("CB"), val("Clr"), val("CageT")
 F, ring_h, head = val("Flare"), val("CageRingH"), val("HeadClear")
 z0, z1 = val("CageZ0"), val("CageZ1")
@@ -175,7 +175,7 @@ def finger_strain():
 
 crown = hat.CrownCut.Shape  # crown without the lip
 lip = hat.CageLip.Shape
-brims = [hat.getObject(f"BrimQ{i}").Shape for i in range(1, 5)]
+brims = [hat.getObject(f"BrimQ{i}").Shape for i in range(1, int(val("BrimSegs")) + 1)]
 head_shape = head_solid()
 for (r, length, z_start), t, rs in zip(rails, RAIL_T, rail_shapes):
     print(f"rail t={t:.0f}: {length:.0f} mm ({int(length // rail.PITCH)} steps, "
