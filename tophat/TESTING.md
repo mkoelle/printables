@@ -30,7 +30,8 @@ Joints between hat parts.
 
 | Print | Checks | Pass when | If it fails |
 |-------|--------|-----------|-------------|
-| `test_rail` + `test_slider*` | Cage rail and slider detent | Slider clicks per 2.4 mm step, holds about 50 g upside down and shaken, tab lifts to release | Pick the thinnest tongue that holds; adjust `CLR` or `TONGUES` in `rail.py` |
+| `test_rail` + `test_slider*` | Cage rail T-fit and slider detent | Slider slides onto the T-rail, clicks per 2.4 mm step, holds about 50 g upside down and shaken, pinch handle pulls out to release without cracking the tongue root | If the T-fit is tight, increase `T_CLR`; for detent holding, adjust `CLR` or `TONGUES` in `rail.py` |
+| `test_rail_dovetail` + `test_dovetail_slider*` | Dovetail alternative (45 deg lips, edge chamfers, lead-ins) | Same as above; compare against the T set for fit, side play and print quality of the lips | If it beats the T set, switch `cage.py` to `rail.rail(..., dovetail=True)` and the sliders to `dovetail=True, chamfer=True` |
 
 ## Assembly order
 

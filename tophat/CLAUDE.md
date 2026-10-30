@@ -51,5 +51,5 @@ change, confirm:
 - New dimensions go in the `Params` spreadsheet (`tophat_param.py`) as Main,
   Advanced (formula) or Derived, with a note.
 - Print orientation is set at export: crown flipped, wide oval parts turned
-  45 deg, sliders on their back.
+  45 deg, sliders front-down (tongue on the bed).
 - `.FCBak` files are FreeCAD's automatic backups.

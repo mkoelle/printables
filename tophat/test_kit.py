@@ -18,10 +18,13 @@ FixtureTests.FCStd: joints between hat parts
   dovetail_curl_*  brim seam on the side axis (curled brim)
   lip_ring         crown top band with the cage lip, top down
   finger_tip       CageFingers front finger tip; wedges behind lip_ring
-RailTests.FCStd: cage mounting system
-  rail             50 mm cage rail on a test foot
-  slider_N         sliders with 1.0 / 1.2 / 1.4 mm detent tongues
-                   (1, 2, 3 side notches)
+RailTests.FCStd: cage mounting system, two sets to print and compare
+  rail             50 mm T-rail on a test foot (same profile as the cage)
+  slider_N         T sliders with 1.0 / 1.2 / 1.4 mm detent tongues
+                   (1, 2, 3 side notches), printed front-down
+  rail_dovetail    50 mm 45 deg dovetail rail on a test foot
+  dovetail_slider_N  dovetail sliders, same tongues, with elephant-foot
+                   chamfers and channel lead-ins
 """
 import os
 import sys
@@ -72,7 +75,7 @@ def text(label, size, depth):
     return t
 
 
-def orient(shape, flip=False, turn=0, back_down=False, x_up=False):
+def orient(shape, flip=False, turn=0, back_down=False, front_down=False, x_up=False):
     s = shape.copy()
     if flip:
         s.rotate(V(), V(1, 0, 0), 180)
@@ -80,6 +83,8 @@ def orient(shape, flip=False, turn=0, back_down=False, x_up=False):
         s.rotate(V(), V(0, 1, 0), -90)
     if back_down:  # slider back face (min y) onto the bed
         s.rotate(V(), V(1, 0, 0), 90)
+    if front_down:  # slider front face (max y) onto the bed
+        s.rotate(V(), V(1, 0, 0), -90)
     if turn:
         s.rotate(V(), V(0, 0, 1), turn)
     bb = s.optimalBoundingBox()
@@ -194,17 +199,19 @@ if fingers:
 
 # --- Rail and sliders -----------------------------------------------------
 RAIL_L = 50.0
-foot = box(-15, 15, -12, 12 - rail.BASE_T, 0, rail.BASE_T)
-r = rail.rail(RAIL_L)
-r.translate(V(0, 0, rail.BASE_T))
-rail_coupon = add("RailTests", "rail", rail.fuse([foot, r]))
-for i, t in enumerate(rail.TONGUES, start=1):
-    s = rail.slider(t, i)
-    add("RailTests", f"slider{i}_tongue{t}mm", s, back_down=True)
-    if i == 1:
-        seated = s.copy()
-        seated.translate(V(0, 0, rail.BASE_T + rail.seat_offset()))
-        pairs.append(("RailTests", "rail/slider1 seated", rail_coupon, seated))
+for dt, prefix in ((False, ""), (True, "dovetail_")):
+    foot = box(-15, 15, -12, 12 - rail.BASE_T, 0, rail.BASE_T)
+    r = rail.rail(RAIL_L, dovetail=dt)
+    r.translate(V(0, 0, rail.BASE_T))
+    rail_name = "rail_dovetail" if dt else "rail"
+    rail_coupon = add("RailTests", rail_name, rail.fuse([foot, r]))
+    for i, t in enumerate(rail.TONGUES, start=1):
+        s = rail.slider(t, i, dovetail=dt, chamfer=dt)
+        add("RailTests", f"{prefix}slider{i}_tongue{t}mm", s, front_down=True)
+        if i == 1:
+            seated = s.copy()
+            seated.translate(V(0, 0, rail.BASE_T + rail.seat_offset()))
+            pairs.append(("RailTests", f"{rail_name}/{prefix}slider1 seated", rail_coupon, seated))
 
 # --- Models + export ------------------------------------------------------
 out = os.path.join(DIR, "stl")
