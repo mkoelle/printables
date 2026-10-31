@@ -14,18 +14,22 @@ FixtureTests.FCStd: joints between hat parts
   crown_ring       crown bottom (snap groove, rib slots, hatband zone),
                    printed upside down like the full crown
                    (stl/tophat_hatband.stl is the hatband test on crown_ring)
+  joint_poc_brim   small proof of concept: a 30 deg arc of the brim joint
+  joint_poc_crown  (collar, snap ridge, one rib) and the matching crown base
+                   (snap groove, rib slot, joint zone and step). Checks fit,
+                   rib engagement and snap feel before the full rings; an
+                   arc is stiffer than a ring, so the click is firmer
   dovetail_flat_*  brim seam on the front/back axis (flat brim)
   dovetail_curl_*  brim seam on the side axis (curled brim)
   lip_ring         crown top band with the cage lip, top down
   finger_tip       CageFingers front finger tip; wedges behind lip_ring
-RailTests.FCStd: cage mounting system, two sets to print and compare
-  rail             50 mm T-rail on a test foot (same profile as the cage)
-  slider_N         T sliders with 1.0 / 1.2 / 1.4 mm detent tongues
-                   (1, 2, 3 side notches), printed front-down
-  rail_dovetail    50 mm 45 deg dovetail rail on a test foot
-  dovetail_slider_N  dovetail sliders, same tongues, with elephant-foot
-                   chamfers and channel lead-ins
+RailTests.FCStd: cage mounting system
+  rail             50 mm dovetail cage rail on a test foot
+  slider_N         sliders with 1.2 / 1.4 mm detent tongues (N = 2, 3 side
+                   notches, as numbered in the round-2 prints), front-down
+  slider_N_half    the same at half length (12 mm)
 """
+import math
 import os
 import sys
 import importlib
@@ -168,6 +172,19 @@ crown_ring = add(FIX, "crown_ring", hat.Crown.Shape.common(
     box(-300, 300, -300, 300, -1, BrimT + BandH + 6)), flip=True, turn=45)
 pairs.append((FIX, "collar_ring/crown_ring", collar, crown_ring))
 
+# Joint proof of concept: 30 deg arc centred on the Q2 rib (ellipse t=135)
+POC_T, POC_ARC = 135, 30
+co_a, co_b = A0 + val("CollarT"), B0 + val("CollarT")
+phi = math.degrees(math.atan2(co_b * math.sin(math.radians(POC_T)),
+                              co_a * math.cos(math.radians(POC_T))))
+sector = Part.makeCylinder(300, 400, V(0, 0, -100), V(0, 0, 1), POC_ARC)
+sector.rotate(V(), V(0, 0, 1), phi - POC_ARC / 2)
+poc_brim = add(FIX, "joint_poc_brim", hat.BrimRing.Shape.common(
+    oval(A0 + 12, B0 + 12, -1, BrimT + CollarH + 2)).common(sector))
+poc_crown = add(FIX, "joint_poc_crown", hat.Crown.Shape.common(
+    box(-300, 300, -300, 300, -1, val("JointZ") + val("JointT") - Wall + 6)).common(sector), flip=True)
+pairs.append((FIX, "joint_poc", poc_brim, poc_crown))
+
 tiles = {
     "dovetail_flat": (box(A0 + 8, A0 + BrimW + 1, -25, 25, -5, 60), f"BrimQ{SEGS}", "BrimQ1"),
     "dovetail_curl": (box(-25, 25, B0 + 8, B0 + BrimW + 1, -5, 60), f"BrimQ{SEGS // 4}", f"BrimQ{SEGS // 4 + 1}"),
@@ -201,19 +218,20 @@ if fingers:
 
 # --- Rail and sliders -----------------------------------------------------
 RAIL_L = 50.0
-for dt, prefix in ((False, ""), (True, "dovetail_")):
-    foot = box(-15, 15, -12, 12 - rail.BASE_T, 0, rail.BASE_T)
-    r = rail.rail(RAIL_L, dovetail=dt)
-    r.translate(V(0, 0, rail.BASE_T))
-    rail_name = "rail_dovetail" if dt else "rail"
-    rail_coupon = add("RailTests", rail_name, rail.fuse([foot, r]))
-    for i, t in enumerate(rail.TONGUES, start=1):
-        s = rail.slider(t, i, dovetail=dt, chamfer=dt)
-        add("RailTests", f"{prefix}slider{i}_tongue{t}mm", s, front_down=True)
-        if i == 1:
+foot = box(-15, 15, -12, 12 - rail.BASE_T, 0, rail.BASE_T)
+r = rail.rail(RAIL_L)
+r.translate(V(0, 0, rail.BASE_T))
+rail_coupon = add("RailTests", "rail", rail.fuse([foot, r]))
+# full-length sliders, plus half-length ones (more per rail; their short
+# tongue strains about 3x more, so they test the failure limit)
+for length, tag in ((rail.SLIDER_L, ""), (rail.SLIDER_L / 2, "_half")):
+    for i, (mark, t) in enumerate(rail.TONGUES):
+        s = rail.slider(t, mark, length)
+        add("RailTests", f"slider{mark}{tag}_tongue{t}mm", s, front_down=True)
+        if i == 0:
             seated = s.copy()
-            seated.translate(V(0, 0, rail.BASE_T + rail.seat_offset()))
-            pairs.append(("RailTests", f"{rail_name}/{prefix}slider1 seated", rail_coupon, seated))
+            seated.translate(V(0, 0, rail.BASE_T + rail.seat_offset(length)))
+            pairs.append(("RailTests", f"rail/slider{tag} seated", rail_coupon, seated))
 
 # --- Models + export ------------------------------------------------------
 out = os.path.join(DIR, "stl")

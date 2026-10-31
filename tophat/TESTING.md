@@ -20,6 +20,7 @@ Joints between hat parts.
 
 | Print | Checks | Pass when | If it fails |
 |-------|--------|-----------|-------------|
+| `test_joint_poc_brim` + `test_joint_poc_crown` | Quick check of the brim-to-crown joint before the full rings: a 30 deg arc with collar, snap ridge and one rib, and the matching crown base (groove, rib slot, joint zone) | Rib drops into its slot, crown arc seats flush on the brim, snap ridge engages the groove. An arc is stiffer than a ring, so expect a firmer click than the full joint | Rib binds: raise `Clr` by 0.05. Snap will not engage at all: lower `Snap` by 0.1. Then print the full rings |
 | `test_collar_ring` + `test_crown_ring` | Brim-to-crown snap and ribs | Crown ring clicks on with firm thumb pressure, only one orientation (wide rib front-right), no rotation play, pulls off with effort | Too tight or will not click: raise `Clr` by 0.05 or lower `Snap` (Advanced) by 0.1. Too loose: the opposite |
 | `tophat_hatband` + `test_crown_ring` | Hatband | Slides on from the crown's bottom end and drops to rest on the brim without wobble | Bump `Clr` by 0.05 |
 | `test_dovetail_flat_*` | Brim seam, flat area | Pieces press together by hand, top surfaces flush, no gap at seam | Raise or lower `Clr` by 0.05 |
@@ -30,8 +31,8 @@ Joints between hat parts.
 
 | Print | Checks | Pass when | If it fails |
 |-------|--------|-----------|-------------|
-| `test_rail` + `test_slider*` | Cage rail T-fit and slider detent | Slider slides onto the T-rail, clicks per 2.4 mm step, holds about 50 g upside down and shaken, pinch handle pulls out to release without cracking the tongue root | If the T-fit is tight, increase `T_CLR`; for detent holding, adjust `CLR` or `TONGUES` in `rail.py` |
-| `test_rail_dovetail` + `test_dovetail_slider*` | Dovetail alternative (45 deg lips, edge chamfers, lead-ins) | Same as above; compare against the T set for fit, side play and print quality of the lips | If it beats the T set, switch `cage.py` to `rail.rail(..., dovetail=True)` and the sliders to `dovetail=True, chamfer=True` |
+| `test_rail` + `test_slider2/3*` | Dovetail cage rail and slider detent (1.2 vs 1.4 mm tongue) | Slider slides onto the rail, clicks per 2.4 mm step, holds about 50 g upside down and shaken, pinch handle pulls out to release without cracking the tongue root | Pick the thinner tongue that holds and set `TONGUES` in `rail.py` to it. Tight slide-on: raise `T_CLR`; weak hold: lower `CLR` |
+| `test_rail` + `test_slider2/3_half*` | Half-length (12 mm) sliders: more per rail | Same as above | Expected to fail: the short tongue reaches about 2-4% strain at a full click (PLA breaks around 2-3%). If they crack, a 3/4-length (18 mm) slider is the realistic short option |
 
 ## Assembly order
 

@@ -8,7 +8,7 @@ when the crown snaps onto the brim; the tips' inner edges are bevelled to
 slide onto it. The ring sits on the brim collar and its inner size equals
 the head opening.
 
-RAIL_COUNT T-rails (see rail.py), one per finger, run from just above the
+RAIL_COUNT dovetail rails (see rail.py), one per finger, run from just above the
 head to just under the lip, following the wall's flare. The head is modelled
 as a dome: full opening size up to the collar top, rising to HeadClear at the
 centre. Rails stop HeadGap above that dome, measured at a seated slider's

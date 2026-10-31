@@ -4,8 +4,9 @@ Parts: Crown, Hatband, BrimQ1..BrimQ<BrimSegs> (brim segments). The
 interior cage (CageFingers) is built by cage.py from these Params.
 - Head size comes from SIZE below (a preset or a measured circumference).
 - Wall thicknesses are whole nozzle perimeters (Nozzle, WallPerims).
-- Crown wall is JointT at the brim (snap, ribs) and tapers to Wall at the
-  hatband top, so the thick joint zone stays hidden under the band.
+- Crown wall is JointT at the brim, over the snap groove and rib slots up
+  to JointZ, then steps in 45 deg to Wall. The step sits under the hatband,
+  whose cone the joint zone follows.
 - Brim is flat beside the crown and curls up at the sides (Curl, FlatW).
   A binding band (RimW, RimT) stands proud round its outer edge, ending
   square to the sheet (also on the curls) with a rounded top (RimR) and a
@@ -38,7 +39,7 @@ sh = doc.addObject("Spreadsheet::Sheet", "Params")
 main = [
     ("HeadCirc", f"{HEAD_CIRC:g} mm", f"Head circumference (size {SIZE}; set SIZE in tophat_param.py)"),
     ("Oval",     "0.8",    "Head width/length ratio (0.75 long oval .. 0.85 round)"),
-    ("CrownH",   "150 mm", "Total hat height (brim bottom to crown top)"),
+    ("CrownH",   "177.8 mm", "Total hat height (brim bottom to crown top), 7 in"),
     ("Flare",    "1.06",   "Crown top scale vs base"),
     ("BrimW",    "65 mm",  "Brim width beyond head opening"),
     ("Curl",     "25 mm",  "Brim side curl height at outer edge (> 0)"),
@@ -49,7 +50,7 @@ main = [
 ]
 advanced = [
     ("JointPerims", "7",               "Crown wall perimeters at the brim joint (JointT), under the hatband"),
-    ("CapT",      "1.6 mm",            "Crown top cap thickness (printed on the bed)"),
+    ("CapT",      "1.2 mm",            "Crown top cap thickness (6 layers, printed on the bed)"),
     ("BrimT",     "1.6 mm",            "Brim thickness (8 layers at 0.2 mm, as cad_tophat)"),
     ("RimW",      "6 mm",              "Edge binding band width (like a grosgrain-bound brim)"),
     ("RimT",      "1.2 mm",            "Edge binding height above the brim top face"),
@@ -89,6 +90,13 @@ derived = [
     ("HatSizeUS", "(HeadCirc / 25.4 mm) / pi", "US hat size (inches / pi)"),
     ("BandS", "1 + (Flare - 1) * (BandH - CollarH - 1 mm) / (CrownH - CapT - BrimT - CollarH - 1 mm)",
               "Crown inner scale at the hatband top (wall reaches Wall there)"),
+    ("JointZ", "BrimT + CollarH + Clr + 1 mm", "Top of the thick joint zone: 1 mm above the rib slots"),
+    ("JointA", "CA + JointT + (CA * BandS + Wall - CA - JointT) * (JointZ - BrimT) / BandH",
+               "Crown outer half-length at JointZ (on the hatband cone)"),
+    ("JointB", "CB + JointT + (CB * BandS + Wall - CB - JointT) * (JointZ - BrimT) / BandH",
+               "Crown outer half-width at JointZ (on the hatband cone)"),
+    ("JointS2", "1 + (Flare - 1) * (JointZ + JointT - Wall - BrimT - CollarH - 1 mm) / (CrownH - CapT - BrimT - CollarH - 1 mm)",
+                "Crown inner scale where the 45 deg step reaches Wall"),
     ("CrownTopA", "CA * Flare + Wall", "Crown top outer half-length"),
     ("CrownTopB", "CB * Flare + Wall", "Crown top outer half-width"),
     ("CrownFit45", "2 * sqrt((CrownTopA ^ 2 + CrownTopB ^ 2) / 2)",
@@ -203,12 +211,16 @@ def rot_z(deg):
 P = "Params."
 
 # --- Crown: open bottom, seats on brim top, slides over collar ------------
-# Outer wall: JointT thick at the brim, tapering to Wall at the hatband top,
-# then Wall thick up to the cap. The taper hides under the hatband.
+# Outer wall: JointT thick at the brim on the hatband cone up to JointZ,
+# a 45 deg step in to Wall, then Wall thick up to the cap. Under the band
+# the step leaves a hidden gap between crown and band.
 z0 = f"{P}BrimT"
 z_band = f"{P}BrimT + {P}BandH"
 outer = loft("CrownOuter", [
     ellipse("OuterBot", f"{P}CA + {P}JointT", f"{P}CB + {P}JointT", z0),
+    ellipse("OuterJoint", f"{P}JointA", f"{P}JointB", f"{P}JointZ"),
+    ellipse("OuterStep", f"{P}CA * {P}JointS2 + {P}Wall", f"{P}CB * {P}JointS2 + {P}Wall",
+            f"{P}JointZ + {P}JointT - {P}Wall"),
     ellipse("OuterBand", f"{P}CA * {P}BandS + {P}Wall", f"{P}CB * {P}BandS + {P}Wall", z_band),
     ellipse("OuterTop", f"{P}CrownTopA", f"{P}CrownTopB", f"{P}CrownH"),
 ])
@@ -223,7 +235,8 @@ inner = loft("CrownInner", [
 inner.Ruled = True
 crown_body = boolean("Cut", "CrownBody", outer, inner)
 
-# --- Hatband: follows the crown's outer taper, Clr gap inside, BandT thick -
+# --- Hatband: cone over the joint zone, Clr gap inside, BandT thick -------
+# Visual reference for a fabric band (38-50 mm grosgrain); optional print.
 # Slides on from the crown's narrow bottom end before the crown meets the
 # brim; gravity seats it on the brim top.
 zb, zt = z0, z_band
