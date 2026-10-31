@@ -10,6 +10,9 @@
 
 Step 1 discards any Params edits made only in the spreadsheet; put lasting
 changes in the main / advanced lists in tophat_param.py.
+
+The whole run takes over 30 minutes, longer than one MCP call allows. From
+Claude, run the steps as separate calls; FreeCAD finishes a timed-out call.
 """
 import os
 import FreeCAD as App

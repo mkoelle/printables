@@ -15,9 +15,16 @@ Read `README.md` first (parts, files, decisions, status) and `TESTING.md`
   `xmlrpc.client.ServerProxy("http://localhost:9875").execute_code(src)`.
   FreeCAD must be running with the MCP addon's RPC server started.
 - Rebuild order: `tophat_param.py` -> save `TopHat.FCStd` -> `export_stl.py`
-  -> `cage.py` -> `test_kit.py`. `build_all.py` does all of it.
+  -> `cage.py` -> `test_kit.py`. `build_all.py` does all of it, but takes
+  longer than one MCP call allows (over 30 min); run the steps as separate
+  calls. `cage.py` only needs rerunning when the crown, lip or `rail.py`
+  changes.
 - `tophat_param.py` recreates `TopHat` from its parameter defaults, which
   discards spreadsheet-only edits.
+- Some geometry is built in Python when `tophat_param.py` runs, not driven
+  by spreadsheet expressions: `BrimSegs`, the edge binding (`Rim`) and the
+  dovetail keys and seam reliefs (`KeyPrism<q>`, `SeamCut<q>`). Rerun the
+  script after changing the parameters they read.
 
 ## Verifying a change
 
@@ -37,6 +44,9 @@ change, confirm:
 - Fuse many shapes in one call (`a.fuse([b, c])`, as `rail.fuse` does).
   Chained pairwise fuses produced invalid solids.
 - `removeSplitter()` can break a valid solid; check `isValid()` after it.
+  The same goes for `Refine` on Part boolean features, whose default comes
+  from the user's preferences: it left `BrimRing` invalid, so `BrimSolid`
+  and `BrimRing` set `Refine = False`.
 - `Shape.BoundBox` is loose on refined or fused shapes; use
   `optimalBoundingBox()` for sizes and bed placement.
 - `TopoShape.rotate/translate` change the shape's Placement. When putting

@@ -105,11 +105,28 @@ and `test_kit.py`).
 - **Wedge lip** under the crown top: lead-in taper then a press band that
   squeezes finger tips `LipPress` against the wall (anti-rattle).
 
-## Status (2026-10-18)
+## Status (2026-10-31)
 
-- Modelled and checked at head sizes 550 / 570 / 610 mm: hat, cage, all tests.
-- Next: print round 1 (`stl/round1/`), then set `HeadCirc`, `Oval`,
-  `HeadClear`, `Clr` and slider tongue thickness from the results; print
-  round 2 (snap, hatband, wedge lip). See `TESTING.md`.
-- Not started: device holders that snap onto sliders.
-- Open options: mid-height cage ring if fingers flex under load.
+Size M, 7 in tall: crown 275 g, brim 4 x 32 g, hatband 32 g, cage 116 g.
+All parts model as valid, single solids and fit a 220 mm bed.
+
+Test prints so far:
+
+- **Round 1** (`stl/round1/`): head fit, dovetail seam, T-rail and sliders.
+  The sliders were too tight and the spring tongue snapped at its root.
+- **Round 2**: reworked sliders on a T-rail and a dovetail rail. The
+  dovetail rail was chosen.
+- **Round 3**: 12 mm sliders won (1.2 mm tongue). The brim seam coupon with
+  rounded keys still stood open: corners bulged at both seam ends. The seam
+  ends are now set back (`SeamGap`, `SeamTaper`).
+
+Next:
+
+- Reprint `test_dovetail_flat_*` to check the seam set-back.
+- Print the joint test pieces (`test_joint_poc_*`), then the collar and crown
+  rings, and the lip ring with a finger tip. See `TESTING.md`.
+- Then print the full hat.
+
+Not started: device holders that snap onto sliders.
+
+Open options: mid-height cage ring if the fingers flex under load.

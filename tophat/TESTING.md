@@ -4,6 +4,23 @@ Print these in PLA before printing the full hat. Re-generate them with
 `test_kit.py` (run inside FreeCAD) after changing any parameter or `rail.py`.
 STLs are in `stl/test_*.stl`.
 
+## Print next
+
+Still to test, smallest first (about 150 g in all):
+
+1. `test_dovetail_flat_tongue` + `_socket` (6 g): the brim seam with its
+   set-back ends.
+2. `test_joint_poc_brim` + `_crown` (6 g): a quick check of the brim-to-crown
+   joint.
+3. `test_collar_ring` + `test_crown_ring` (92 g): the full snap joint.
+4. `test_lip_ring` + `test_finger_tip` (32 g): the cage finger in the wedge
+   lip.
+
+Optional: `test_dovetail_curl_*` (7 g) for the seam on the curl. Print the
+head-fit pieces if no one has done so for this wearer. The rail and slider
+were settled in round 3, so print them again only after changing `rail.py`.
+Use the slicer settings you will use for the hat: fits depend on them.
+
 ## 1. Head fit (`TopHatFitTests.FCStd`)
 
 Try-on pieces for the wearer. Do this first: every other part is sized from
@@ -23,7 +40,7 @@ Joints between hat parts.
 | `test_joint_poc_brim` + `test_joint_poc_crown` | Quick check of the brim-to-crown joint before the full rings: a 30 deg arc with collar, snap ridge and one rib, and the matching crown base (groove, rib slot, joint zone) | Rib drops into its slot, crown arc seats flush on the brim, snap ridge engages the groove. An arc is stiffer than a ring, so expect a firmer click than the full joint | Rib binds: raise `Clr` by 0.05. Snap will not engage at all: lower `Snap` by 0.1. Then print the full rings |
 | `test_collar_ring` + `test_crown_ring` | Brim-to-crown snap and ribs | Crown ring clicks on with firm thumb pressure, only one orientation (wide rib front-right), no rotation play, pulls off with effort | Too tight or will not click: raise `Clr` by 0.05 or lower `Snap` (Advanced) by 0.1. Too loose: the opposite |
 | `tophat_hatband` + `test_crown_ring` | Hatband | Slides on from the crown's bottom end and drops to rest on the brim without wobble | Bump `Clr` by 0.05 |
-| `test_dovetail_flat_*` | Brim seam, flat area (rounded key corners, chamfered bed edges, set-back seam ends) | Pieces press together by hand, top surfaces flush, no gap at seam | Seam pinched shut at an end and open in the middle: raise `SeamGap` by 0.1 or lengthen `SeamTaper`. Gap at the key corners: raise `KeyR`. Gap at the bottom edge only: raise `SeamEF`. Loose or tight key: change `Clr` by 0.05. Put the slicer's perimeter seam on the back or randomise it, not at sharpest corner |
+| `test_dovetail_flat_*` | Brim seam, flat area (rounded key corners, chamfered bed edges, set-back seam ends) | Pieces press together by hand, top surfaces flush, no gap at seam | Seam pinched shut at an end and open in the middle: raise `SeamGap` by 0.1 or lengthen `SeamTaper`. Gap at the key corners: raise `KeyR`. Gap at the bottom edge only: raise `SeamEF`. Loose or tight key: change `Clr` by 0.05. Put the slicer's perimeter seam on the back or randomise it, not at the sharpest corner |
 | `test_dovetail_curl_*` | Brim seam, curled area; curl print quality | Same as above, and the curl underside printed cleanly | Turn on tree supports for the brim pieces |
 | `test_lip_ring` + `test_finger_tip` | CageFingers tip in the wedge lip | Tip slides onto the lip's lower edge, then wedges tight against the wall with firm push; no rattle, does not crack | Too tight: lower `LipPress` by 0.1; loose: raise it |
 
