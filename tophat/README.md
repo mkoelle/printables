@@ -53,7 +53,8 @@ and `test_kit.py`).
 ## Design decisions
 
 - **PLA for every part.** Flexures (slider tongues, cage fingers) are sized to
-  stay under about 1% bending strain.
+  stay under about 1% bending strain. Exception: the 12 mm slider tongue
+  (about 2% by estimate) won the round-3 prints without cracking.
 - **Nothing visible outside.** No holes, seams or ports on the crown; all
   cage features are internal. The crown prints top-down so internal features
   on its top never show.
@@ -64,7 +65,7 @@ and `test_kit.py`).
   two-half cage with lap seams (heavier, more parts; dropped for the fingers).
 - **Dovetail rails** (45 deg flanks), chosen over a T-rail in the round-2
   prints: slider lips print without overhangs and the slider self-centres.
-  Slider tongue 1.2 or 1.4 mm, still to choose.
+  Sliders are 12 mm long with a 1.2 mm tongue, chosen from test prints.
 - **6 rails**, evenly spaced, starting front and back. Rails stop `HeadGap`
   above a dome model of the head, so they run lower at the sides than the top
   of the head (`HeadClear`).
@@ -82,12 +83,15 @@ and `test_kit.py`).
   the dovetail test coupons stay valid). The crown is never cut (snap
   groove and lip run round it); `tophat_param.py` warns when it does not
   fit, as at XXL on a 220 mm bed.
-- **Seams close flush.** On the first test prints, bulging printed corners
-  held the brim seams open. The dovetail corners are now rounded (`KeyR`
-  1 mm; sockets `KeyR` + `Clr`). The seam and key edges on the bed have a
-  45 deg `SeamEF` chamfer for elephant foot. Each seam end has a small
-  `SeamNotch` relief at the head opening, the collar and the binding. The
-  keys are built in Python when `tophat_param.py` runs, like the binding.
+- **Seams close flush.** On the test prints, bulging printed corners held
+  the brim seams open. The dovetail corners are rounded (`KeyR` 1 mm;
+  sockets `KeyR` + `Clr`). The seam and key edges on the bed have a 45 deg
+  `SeamEF` chamfer for elephant foot. At both seam ends, where the pieces
+  end in narrow strips with square corners (collar, edge binding), the seam
+  faces stand `SeamGap` back from each other and taper to contact over
+  `SeamTaper`. Small notches at the ends were tried first and did not
+  help: a notch only makes two new square corners. The keys are built in
+  Python when `tophat_param.py` runs, like the binding.
 - **Thin brim with a bound edge.** `BrimT` 1.6 mm (8 layers), as in
   cad_tophat, where a brim this thin held its shape. A binding band `RimW`
   6 mm wide stands `RimT` 1.2 mm proud round the whole outer edge, like the
@@ -108,5 +112,4 @@ and `test_kit.py`).
   `HeadClear`, `Clr` and slider tongue thickness from the results; print
   round 2 (snap, hatband, wedge lip). See `TESTING.md`.
 - Not started: device holders that snap onto sliders.
-- Open options: shorter 18 mm slider for 3 sliders per rail (currently 2);
-  mid-height cage ring if fingers flex under load.
+- Open options: mid-height cage ring if fingers flex under load.

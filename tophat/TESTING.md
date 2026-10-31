@@ -23,7 +23,7 @@ Joints between hat parts.
 | `test_joint_poc_brim` + `test_joint_poc_crown` | Quick check of the brim-to-crown joint before the full rings: a 30 deg arc with collar, snap ridge and one rib, and the matching crown base (groove, rib slot, joint zone) | Rib drops into its slot, crown arc seats flush on the brim, snap ridge engages the groove. An arc is stiffer than a ring, so expect a firmer click than the full joint | Rib binds: raise `Clr` by 0.05. Snap will not engage at all: lower `Snap` by 0.1. Then print the full rings |
 | `test_collar_ring` + `test_crown_ring` | Brim-to-crown snap and ribs | Crown ring clicks on with firm thumb pressure, only one orientation (wide rib front-right), no rotation play, pulls off with effort | Too tight or will not click: raise `Clr` by 0.05 or lower `Snap` (Advanced) by 0.1. Too loose: the opposite |
 | `tophat_hatband` + `test_crown_ring` | Hatband | Slides on from the crown's bottom end and drops to rest on the brim without wobble | Bump `Clr` by 0.05 |
-| `test_dovetail_flat_*` | Brim seam, flat area (rounded key corners, chamfered bed edges) | Pieces press together by hand, top surfaces flush, no gap at seam | Gap at the key corners: raise `KeyR`. Gap at the bottom edge: raise `SeamEF`. Loose or tight key: change `Clr` by 0.05. Put the slicer's perimeter seam on the back or randomise it, not at sharpest corner |
+| `test_dovetail_flat_*` | Brim seam, flat area (rounded key corners, chamfered bed edges, set-back seam ends) | Pieces press together by hand, top surfaces flush, no gap at seam | Seam pinched shut at an end and open in the middle: raise `SeamGap` by 0.1 or lengthen `SeamTaper`. Gap at the key corners: raise `KeyR`. Gap at the bottom edge only: raise `SeamEF`. Loose or tight key: change `Clr` by 0.05. Put the slicer's perimeter seam on the back or randomise it, not at sharpest corner |
 | `test_dovetail_curl_*` | Brim seam, curled area; curl print quality | Same as above, and the curl underside printed cleanly | Turn on tree supports for the brim pieces |
 | `test_lip_ring` + `test_finger_tip` | CageFingers tip in the wedge lip | Tip slides onto the lip's lower edge, then wedges tight against the wall with firm push; no rattle, does not crack | Too tight: lower `LipPress` by 0.1; loose: raise it |
 
@@ -31,8 +31,7 @@ Joints between hat parts.
 
 | Print | Checks | Pass when | If it fails |
 |-------|--------|-----------|-------------|
-| `test_rail` + `test_slider2/3*` | Dovetail cage rail and slider detent (1.2 vs 1.4 mm tongue) | Slider slides onto the rail, clicks per 2.4 mm step, holds about 50 g upside down and shaken, pinch handle pulls out to release without cracking the tongue root | Pick the thinner tongue that holds and set `TONGUES` in `rail.py` to it. Tight slide-on: raise `T_CLR`; weak hold: lower `CLR` |
-| `test_rail` + `test_slider2/3_half*` | Half-length (12 mm) sliders: more per rail | Same as above | Expected to fail: the short tongue reaches about 2-4% strain at a full click (PLA breaks around 2-3%). If they crack, a 3/4-length (18 mm) slider is the realistic short option |
+| `test_rail` + `test_slider` | Dovetail cage rail and the 12 mm slider with the 1.2 mm detent tongue (chosen in round 3) | Slider slides onto the rail, clicks per 2.4 mm step, holds about 50 g upside down and shaken, pinch handle pulls out to release without cracking the tongue root | Tight slide-on: raise `T_CLR`. Weak hold: lower `CLR`. Tongue cracks: lengthen `SLIDER_L` (18 mm halves the strain) or thin `TONGUE_T` |
 
 ## Assembly order
 

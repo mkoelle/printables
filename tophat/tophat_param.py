@@ -15,7 +15,7 @@ interior cage (CageFingers) is built by cage.py from these Params.
 - Brim is cut into the fewest segments (a multiple of 4) that fit Bed;
   segments join with dovetail keys at each seam; keys follow the curl.
   Key corners are rounded and seam bed edges chamfered so printed corner
-  bulges cannot hold the seams open (KeyR, SeamEF, SeamNotch).
+  bulges cannot hold the seams open (KeyR, SeamEF, SeamGap).
 - Brim carries an inner collar; the crown slides over it and seats on the brim.
 Edit the Main section of the Params spreadsheet and recompute. The segment
 count is fixed when this script runs, so rerun it after size or Bed changes.
@@ -69,7 +69,8 @@ advanced = [
     ("KeyDepth",  "KeyNeck * 0.8",     "Dovetail depth past seam"),
     ("KeyR",      "1 mm",              "Dovetail corner radius (printed sharp corners bulge and hold the seam open)"),
     ("SeamEF",    "0.4 mm",            "45 deg chamfer on seam and key bed edges (elephant foot)"),
-    ("SeamNotch", "0.5 mm",            "Relief radius at the seam ends (head opening, collar, edge binding)"),
+    ("SeamGap",   "0.3 mm",            "Seam set-back per side at the seam ends (collar, edge binding), for corner bulge"),
+    ("SeamTaper", "4 mm",              "Length over which the seam set-back tapers back to contact"),
     ("RibR",      "0.8 mm",            "Alignment rib height (into crown wall slot)"),
     ("RibW",      "6 mm",              "Alignment rib width"),
     ("RibWFront", "RibW + 4 mm",       "Wide front-right rib (sets crown orientation)"),
@@ -447,8 +448,8 @@ brim_solid.Refine = brim_ring.Refine = False
 # runs, like the binding. Printed corners bulge (and slicers park the
 # perimeter seam on sharp corners), which held the test seams open, so:
 # key corners are rounded (KeyR; the socket follows at a Clr offset), the
-# bed edges of the seam and key carry a SeamEF chamfer, and each seam end
-# gets a SeamNotch relief.
+# bed edges of the seam and key carry a SeamEF chamfer, and the seam faces
+# stand SeamGap apart at both ends (where the printed corners are).
 def rounded_wire(pts, radii):
     """Closed wire through pts (Vectors) with corner i rounded to radii[i]."""
     n, edges, ends = len(pts), [], []
@@ -511,7 +512,7 @@ def seam_tools(seam):
     a0, b0, w = val("A0"), val("B0"), val("BrimW")
     r_in, r_out = ray(a0, b0, phi), ray(a0 + w, b0 + w, phi)
     mid = (r_in + val("CollarT") + r_out) / 2
-    ef, notch, clr = val("SeamEF"), val("SeamNotch"), val("Clr")
+    ef, clr = val("SeamEF"), val("Clr")
     z_top = val("Curl") + val("BrimT") + 2
     tongue = chamfered_prism(key_outline(mid, 0), ef, z_top)
     socket = chamfered_prism(key_outline(mid, clr), -ef, z_top)
@@ -522,21 +523,24 @@ def seam_tools(seam):
     span = val("KeyNeck") / 2 + val("KeyR")  # key chamfers cover the rest
     relief = [tri.extrude(V(mid - span - r_in + 2, 0, 0)).translated(V(r_in - 2, 0, 0)),
               tri.extrude(V(r_out + 10 - mid - span, 0, 0)).translated(V(mid + span, 0, 0))]
-    # seam-end notches: head opening, collar outside (above the sheet)
+    # seam-end set-back: the seam faces stand SeamGap back from each other
+    # where the pieces end in narrow strips with square corners (collar and
+    # head opening; edge binding and its rim), so corner bulges have room,
+    # then taper back to contact over SeamTaper (too shallow to bulge)
+    g, L = val("SeamGap"), val("SeamTaper")
+    x0, x1 = r_in + val("CollarT"), r_out - val("RimW") - 1
     zc = val("BrimT") + val("CollarH") + 2
-    relief.append(Part.makeCylinder(notch, zc + 1, V(r_in, 0, -1)))
-    relief.append(Part.makeCylinder(notch, zc - val("BrimT"), V(r_in + val("CollarT"), 0, val("BrimT"))))
+    relief.append(Part.Face(Part.makePolygon([
+        V(r_in - 2, -g, -1), V(x0, -g, -1), V(x0 + L, 0, -1), V(x0, g, -1),
+        V(r_in - 2, g, -1), V(r_in - 2, -g, -1)])).extrude(V(0, 0, zc + 1)))
+    relief.append(Part.Face(Part.makePolygon([
+        V(r_out + 10, -g, -1), V(x1, -g, -1), V(x1 - L, 0, -1), V(x1, g, -1),
+        V(r_out + 10, g, -1), V(r_out + 10, -g, -1)])).extrude(V(0, 0, z_top + 4)))
     rel = relief[0].fuse(relief[1:])
     place = rot_z(phi)
-    shapes = [tongue, socket, rel]
-    for s in shapes:
-        s.Placement = place.multiply(s.Placement)
-    # outer end: notch square to the sheet through the edge binding
-    c, s_ = math.cos(math.radians(phi)), math.sin(math.radians(phi))
-    q, n, out = edge_frame(math.atan2((a0 + w) * s_, (b0 + w) * c))
-    h = val("BrimT") + val("RimT") + 2
-    edge = Part.makeCylinder(notch, h + 2, q - n * 2, n)
-    return tongue, socket, rel.fuse(edge)
+    for sh_ in (tongue, socket, rel):
+        sh_.Placement = place.multiply(sh_.Placement)
+    return tongue, socket, rel
 
 
 def feature(name, shape):

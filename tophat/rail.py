@@ -27,7 +27,7 @@ RACK_W = 4.0      # rack band width (centre of flange)
 BASE_T = 3.0      # backing plate thickness behind the rail
 BASE_W = 16.0     # backing plate width
 
-SLIDER_L = 24.0   # slider length along rail
+SLIDER_L = 12.0   # slider length along rail (half-length won the round-3 prints)
 SIDE = 2.0        # slider side wall thickness
 FRONT = 2.4       # slider front plate thickness
 TONGUE_W = RACK_W # detent tongue width
@@ -40,12 +40,13 @@ TAB_H = 2.0       # pinch handle height at the tab end
 TAB_WING = 2.0    # pinch handle overhang past each slider side
 EF = 0.5          # elephant-foot chamfer on the bed (front) edges
 LEAD = 0.6        # lead-in chamfer at the channel mouths
-# Tongue candidates as (side notches, thickness), numbered as in the round-2
-# test prints (1.0 mm was dropped). PLA flexure strain stays under ~1%
-# (strain = 3 * t * deflection / (2 * length^2), deflection = DEPTH + CLR).
-# The root taper keeps the peak about the same but moves it to the taper end,
-# away from the slot corners where the first prints snapped.
-TONGUES = [(2, 1.2), (3, 1.4)]
+# Detent tongue thickness, chosen from the round-3 test prints (12 mm slider
+# with the 1.2 mm tongue held and released best). By the beam estimate,
+# strain = 3 * t * deflection / (2 * length^2) with deflection = DEPTH + CLR,
+# this short tongue reaches about 2% at a click, above the ~1% PLA guideline,
+# yet it did not crack in testing. The root taper moves the peak strain off
+# the slot corners where the first prints snapped.
+TONGUE_T = 1.2
 
 Y_FACE = STEM_H + FLANGE_T  # flange front face (rack base)
 DEPTH_TOTAL = Y_FACE + DEPTH  # rail protrusion from backing face
@@ -101,7 +102,7 @@ def channel(y_back, y_in):
     return back + front
 
 
-def slider(tongue_t, mark=0, length=SLIDER_L):
+def slider(tongue_t=TONGUE_T, mark=0, length=SLIDER_L):
     """Slider at z=0..length, sitting on a rail whose backing face is y=0."""
     x_out = FLANGE_W / 2 + T_CLR + SIDE
     y_back, y_in = CLR, Y_FACE + DEPTH + CLR

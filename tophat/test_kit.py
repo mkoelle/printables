@@ -25,9 +25,7 @@ FixtureTests.FCStd: joints between hat parts
   finger_tip       CageFingers front finger tip; wedges behind lip_ring
 RailTests.FCStd: cage mounting system
   rail             50 mm dovetail cage rail on a test foot
-  slider_N         sliders with 1.2 / 1.4 mm detent tongues (N = 2, 3 side
-                   notches, as numbered in the round-2 prints), front-down
-  slider_N_half    the same at half length (12 mm)
+  slider           12 mm slider with the 1.2 mm detent tongue, front-down
 """
 import math
 import os
@@ -189,9 +187,19 @@ tiles = {
     "dovetail_flat": (box(A0 + 8, A0 + BrimW + 1, -25, 25, -5, 60), f"BrimQ{SEGS}", "BrimQ1"),
     "dovetail_curl": (box(-25, 25, B0 + 8, B0 + BrimW + 1, -5, 60), f"BrimQ{SEGS // 4}", f"BrimQ{SEGS // 4 + 1}"),
 }
+# the coupon's cut end is a square corner the real brim does not have, so it
+# gets the same SeamGap / SeamTaper set-back as the real seam ends
+def cut_end_relief(u0, along_y):
+    g, L = val("SeamGap"), val("SeamTaper")
+    uv = [(u0 - 1, -g), (u0, -g), (u0 + L, 0), (u0, g), (u0 - 1, g), (u0 - 1, -g)]
+    pts = [V(v, u, -5) if along_y else V(u, v, -5) for u, v in uv]
+    return Part.Face(Part.makePolygon(pts)).extrude(V(0, 0, 65))
+
+
 for name, (clip, tongue_part, socket_part) in tiles.items():
-    t = add(FIX, f"{name}_tongue", hat.getObject(tongue_part).Shape.common(clip))
-    s = add(FIX, f"{name}_socket", hat.getObject(socket_part).Shape.common(clip))
+    end = cut_end_relief(B0 + 8, True) if name == "dovetail_curl" else cut_end_relief(A0 + 8, False)
+    t = add(FIX, f"{name}_tongue", hat.getObject(tongue_part).Shape.common(clip).cut(end))
+    s = add(FIX, f"{name}_socket", hat.getObject(socket_part).Shape.common(clip).cut(end))
     pairs.append((FIX, name, t, s))
 
 def cage_part(model, obj):
@@ -222,16 +230,11 @@ foot = box(-15, 15, -12, 12 - rail.BASE_T, 0, rail.BASE_T)
 r = rail.rail(RAIL_L)
 r.translate(V(0, 0, rail.BASE_T))
 rail_coupon = add("RailTests", "rail", rail.fuse([foot, r]))
-# full-length sliders, plus half-length ones (more per rail; their short
-# tongue strains about 3x more, so they test the failure limit)
-for length, tag in ((rail.SLIDER_L, ""), (rail.SLIDER_L / 2, "_half")):
-    for i, (mark, t) in enumerate(rail.TONGUES):
-        s = rail.slider(t, mark, length)
-        add("RailTests", f"slider{mark}{tag}_tongue{t}mm", s, front_down=True)
-        if i == 0:
-            seated = s.copy()
-            seated.translate(V(0, 0, rail.BASE_T + rail.seat_offset(length)))
-            pairs.append(("RailTests", f"rail/slider{tag} seated", rail_coupon, seated))
+s = rail.slider()
+add("RailTests", "slider", s, front_down=True)
+seated = s.copy()
+seated.translate(V(0, 0, rail.BASE_T + rail.seat_offset()))
+pairs.append(("RailTests", "rail/slider seated", rail_coupon, seated))
 
 # --- Models + export ------------------------------------------------------
 out = os.path.join(DIR, "stl")
