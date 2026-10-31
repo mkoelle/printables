@@ -82,6 +82,12 @@ and `test_kit.py`).
   the dovetail test coupons stay valid). The crown is never cut (snap
   groove and lip run round it); `tophat_param.py` warns when it does not
   fit, as at XXL on a 220 mm bed.
+- **Seams close flush.** On the first test prints, bulging printed corners
+  held the brim seams open. The dovetail corners are now rounded (`KeyR`
+  1 mm; sockets `KeyR` + `Clr`). The seam and key edges on the bed have a
+  45 deg `SeamEF` chamfer for elephant foot. Each seam end has a small
+  `SeamNotch` relief at the head opening, the collar and the binding. The
+  keys are built in Python when `tophat_param.py` runs, like the binding.
 - **Thin brim with a bound edge.** `BrimT` 1.6 mm (8 layers), as in
   cad_tophat, where a brim this thin held its shape. A binding band `RimW`
   6 mm wide stands `RimT` 1.2 mm proud round the whole outer edge, like the

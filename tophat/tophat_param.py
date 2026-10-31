@@ -14,6 +14,8 @@ interior cage (CageFingers) is built by cage.py from these Params.
   this script runs, like the segment count.
 - Brim is cut into the fewest segments (a multiple of 4) that fit Bed;
   segments join with dovetail keys at each seam; keys follow the curl.
+  Key corners are rounded and seam bed edges chamfered so printed corner
+  bulges cannot hold the seams open (KeyR, SeamEF, SeamNotch).
 - Brim carries an inner collar; the crown slides over it and seats on the brim.
 Edit the Main section of the Params spreadsheet and recompute. The segment
 count is fixed when this script runs, so rerun it after size or Bed changes.
@@ -65,6 +67,9 @@ advanced = [
     ("KeyNeck",   "BrimW * 0.15",      "Dovetail neck width (at seam)"),
     ("KeyHead",   "KeyNeck * 1.6",     "Dovetail head width"),
     ("KeyDepth",  "KeyNeck * 0.8",     "Dovetail depth past seam"),
+    ("KeyR",      "1 mm",              "Dovetail corner radius (printed sharp corners bulge and hold the seam open)"),
+    ("SeamEF",    "0.4 mm",            "45 deg chamfer on seam and key bed edges (elephant foot)"),
+    ("SeamNotch", "0.5 mm",            "Relief radius at the seam ends (head opening, collar, edge binding)"),
     ("RibR",      "0.8 mm",            "Alignment rib height (into crown wall slot)"),
     ("RibW",      "6 mm",              "Alignment rib width"),
     ("RibWFront", "RibW + 4 mm",       "Wide front-right rib (sets crown orientation)"),
@@ -306,9 +311,26 @@ brim_disc = boolean("Common", "BrimDisc", sheet, brim_prism)
 # Profile in (s, h): s along the sheet, outward (0 = brim edge), h along the
 # sheet normal (0 = underside). Swept round the edge with the profile square
 # to the sheet, so the curls end square instead of in a vertical knife cut.
-def binding():
+def edge_frame(u_t):
+    """Brim edge at ellipse parameter u_t: underside point, sheet normal, outward."""
     a, b = val("A0") + val("BrimW"), val("B0") + val("BrimW")
     y0, R = val("CurlY0"), val("CurlR")
+    x, y = a * math.cos(u_t), b * math.sin(u_t)
+    dy = abs(y) - y0
+    if dy > 0:  # on a curl: underside height and sheet normal
+        sphi = dy / R
+        z = R - math.sqrt(R * R - dy * dy)
+        n = App.Vector(0, -math.copysign(sphi, y), math.sqrt(1 - sphi * sphi))
+    else:
+        z, n = 0.0, App.Vector(0, 0, 1)
+    nh = App.Vector(math.cos(u_t) / a, math.sin(u_t) / b, 0)
+    nh.normalize()
+    out = nh - n * nh.dot(n)
+    out.normalize()
+    return App.Vector(x, y, z), n, out
+
+
+def binding():
     bt, rt, rw = val("BrimT"), val("RimT"), val("RimW")
     r, c, t = val("RimR"), val("RimChamfer"), val("BrimT") + val("RimT")
 
@@ -319,19 +341,7 @@ def binding():
             + arc(-r, t - r, r, 90, 0, 8) + [(0.0, c), (-c, 0.0)])
 
     def station(u_t):
-        x, y = a * math.cos(u_t), b * math.sin(u_t)
-        dy = abs(y) - y0
-        if dy > 0:  # on a curl: underside height and sheet normal
-            sphi = dy / R
-            z = R - math.sqrt(R * R - dy * dy)
-            n = App.Vector(0, -math.copysign(sphi, y), math.sqrt(1 - sphi * sphi))
-        else:
-            z, n = 0.0, App.Vector(0, 0, 1)
-        nh = App.Vector(math.cos(u_t) / a, math.sin(u_t) / b, 0)
-        nh.normalize()
-        out = nh - n * nh.dot(n)
-        out.normalize()
-        q = App.Vector(x, y, z)
+        q, n, out = edge_frame(u_t)
         pts = [q + out * s_ + n * h for s_, h in prof]
         return Part.makePolygon(pts + [pts[0]])
 
@@ -427,32 +437,115 @@ crown.Refine = True
 brim_solid = doc.addObject("Part::MultiFuse", "BrimSolid")
 brim_solid.Shapes = [brim_disc, rim, collar, ridge] + ribs
 brim_ring = boolean("Cut", "BrimRing", brim_solid, brim_hole)
+# refining these (the Part preference default) left BrimRing invalid
+brim_solid.Refine = brim_ring.Refine = False
 
 # --- Dovetail keys --------------------------------------------------------
-# Seam k lies on the ray at k*360/N deg. Wedge local frame: X = radial along
-# seam, Y = across seam (neck at Y=0, head at Y=KeyDepth), Z = thickness.
-# Seam k tongue belongs to segment k (CCW owner) and enters segment k+1.
-def ray_expr(a, b, phi):
-    return f"({a}) * ({b}) / sqrt((({b}) * cos({phi})) ^ 2 + (({a}) * sin({phi})) ^ 2)"
+# Seam k lies on the ray at k*360/N deg. Seam local frame: X = radial along
+# the seam, Y = across it (into segment k+1), Z up. Seam k's tongue belongs
+# to segment k and enters segment k+1. Built in Python when this script
+# runs, like the binding. Printed corners bulge (and slicers park the
+# perimeter seam on sharp corners), which held the test seams open, so:
+# key corners are rounded (KeyR; the socket follows at a Clr offset), the
+# bed edges of the seam and key carry a SeamEF chamfer, and each seam end
+# gets a SeamNotch relief.
+def rounded_wire(pts, radii):
+    """Closed wire through pts (Vectors) with corner i rounded to radii[i]."""
+    n, edges, ends = len(pts), [], []
+    for i in range(n):
+        p, r = pts[i], radii[i]
+        if r <= 0:
+            ends.append((p, p, None))
+            continue
+        u = pts[i - 1] - p
+        v = pts[(i + 1) % n] - p
+        u.normalize()
+        v.normalize()
+        half = math.acos(max(-1.0, min(1.0, u.dot(v)))) / 2
+        bis = u + v
+        bis.normalize()
+        c = p + bis * (r / math.sin(half))
+        t1, t2 = p + u * (r / math.tan(half)), p + v * (r / math.tan(half))
+        ends.append((t1, t2, Part.Arc(t1, c - bis * r, t2).toShape()))
+    for i in range(n):
+        t1, t2, arc = ends[i]
+        if arc:
+            edges.append(arc)
+        nxt = ends[(i + 1) % n][0]
+        if (nxt - t2).Length > 1e-6:
+            edges.append(Part.makeLine(t2, nxt))
+    return Part.Wire(edges)
 
 
-def key(name, seam, grow, z_lo, z_hi):
+def key_outline(mid, grow):
+    """Tongue (grow 0) or socket (grow Clr) outline at z=0 in the seam frame,
+    with a strip reaching back into the owner segment."""
+    nk = val("KeyNeck") / 2 + grow
+    hk = val("KeyHead") / 2 + grow
+    d = val("KeyDepth") + grow
+    R = val("KeyR")
+    w = val("KeyHead") / 2 + 4
+    V = App.Vector
+    pts = [V(mid - w, -2, 0), V(mid + w, -2, 0), V(mid + w, 0, 0), V(mid + nk, 0, 0),
+           V(mid + hk, d, 0), V(mid - hk, d, 0), V(mid - nk, 0, 0), V(mid - w, 0, 0)]
+    # head corners convex; neck corners concave. The socket rounds both by
+    # R + Clr: at the neck the seam face itself is not offset, so a larger
+    # radius is what keeps the socket clear of the tongue.
+    radii = [0, 0, 0, R + grow, R + grow, R + grow, R + grow, 0]
+    return rounded_wire(pts, radii)
+
+
+def chamfered_prism(wire, ef, z_top):
+    """Wire extruded to z_top with a 45 deg chamfer of ef at the bed (z=0).
+    ef > 0 shrinks the bottom (a solid), ef < 0 flares it (a cutting tool)."""
+    bottom = wire.makeOffset2D(-ef, 2)
+    top = wire.translated(App.Vector(0, 0, abs(ef)))
+    foot = Part.makeLoft([bottom.translated(App.Vector(0, 0, -0.01 if ef < 0 else 0)), top], True, True)
+    body = Part.Face(top).extrude(App.Vector(0, 0, z_top - abs(ef)))
+    return foot.fuse(body).removeSplitter()
+
+
+def seam_tools(seam):
+    """Tongue solid, socket tool and seam-edge relief tool for seam k (global)."""
     phi = seam * 360 / N
-    r_in = ray_expr(f"{P}A0", f"{P}B0", phi)
-    r_out = ray_expr(f"{P}A0 + {P}BrimW", f"{P}B0 + {P}BrimW", phi)
-    mid = f"(({r_in}) + {P}CollarT + ({r_out})) / 2"
-    w = doc.addObject("Part::Wedge", name)
-    w.Placement = rot_z(phi)
-    w.setExpression("Ymin", f"-1 mm - {grow}")
-    w.setExpression("Ymax", f"{P}KeyDepth + {grow}")
-    w.setExpression("Xmin", f"{mid} - {P}KeyNeck / 2 - {grow}")
-    w.setExpression("Xmax", f"{mid} + {P}KeyNeck / 2 + {grow}")
-    w.setExpression("X2min", f"{mid} - {P}KeyHead / 2 - {grow}")
-    w.setExpression("X2max", f"{mid} + {P}KeyHead / 2 + {grow}")
-    for p, v in (("Zmin", z_lo), ("Z2min", z_lo), ("Zmax", z_hi), ("Z2max", z_hi)):
-        w.setExpression(p, v)
-    return w
+    a0, b0, w = val("A0"), val("B0"), val("BrimW")
+    r_in, r_out = ray(a0, b0, phi), ray(a0 + w, b0 + w, phi)
+    mid = (r_in + val("CollarT") + r_out) / 2
+    ef, notch, clr = val("SeamEF"), val("SeamNotch"), val("Clr")
+    z_top = val("Curl") + val("BrimT") + 2
+    tongue = chamfered_prism(key_outline(mid, 0), ef, z_top)
+    socket = chamfered_prism(key_outline(mid, clr), -ef, z_top)
+    # bed-edge chamfer along the straight seam either side of the key
+    V = App.Vector
+    tri = Part.Face(Part.makePolygon([V(0, -ef - 0.01, -0.01), V(0, ef + 0.01, -0.01),
+                                      V(0, 0, ef), V(0, -ef - 0.01, -0.01)]))
+    span = val("KeyNeck") / 2 + val("KeyR")  # key chamfers cover the rest
+    relief = [tri.extrude(V(mid - span - r_in + 2, 0, 0)).translated(V(r_in - 2, 0, 0)),
+              tri.extrude(V(r_out + 10 - mid - span, 0, 0)).translated(V(mid + span, 0, 0))]
+    # seam-end notches: head opening, collar outside (above the sheet)
+    zc = val("BrimT") + val("CollarH") + 2
+    relief.append(Part.makeCylinder(notch, zc + 1, V(r_in, 0, -1)))
+    relief.append(Part.makeCylinder(notch, zc - val("BrimT"), V(r_in + val("CollarT"), 0, val("BrimT"))))
+    rel = relief[0].fuse(relief[1:])
+    place = rot_z(phi)
+    shapes = [tongue, socket, rel]
+    for s in shapes:
+        s.Placement = place.multiply(s.Placement)
+    # outer end: notch square to the sheet through the edge binding
+    c, s_ = math.cos(math.radians(phi)), math.sin(math.radians(phi))
+    q, n, out = edge_frame(math.atan2((a0 + w) * s_, (b0 + w) * c))
+    h = val("BrimT") + val("RimT") + 2
+    edge = Part.makeCylinder(notch, h + 2, q - n * 2, n)
+    return tongue, socket, rel.fuse(edge)
 
+
+def feature(name, shape):
+    f = doc.addObject("Part::Feature", name)
+    f.Shape = shape
+    return f
+
+
+tools = [seam_tools(k) for k in range(N)]
 pieces = []
 for q in range(1, N + 1):
     sector = doc.addObject("Part::Cylinder", f"SegSector{q}")
@@ -462,13 +555,11 @@ for q in range(1, N + 1):
     quad = boolean("Common", f"BrimQ{q}Base", brim_ring, sector)
     owned, incoming = q % N, q - 1  # seam indices
     # Keys are tall prisms clipped to the brim, so they follow the curl
-    z_top = f"{P}Curl + {P}BrimT + 2 mm"
-    tongue = boolean("Common", f"Key{q}", brim_ring,
-                     key(f"KeyPrism{q}", owned, "0 mm", "-2 mm", z_top))
-    socket = key(f"Socket{q}", incoming, f"{P}Clr", "-2 mm", z_top)
+    tongue = boolean("Common", f"Key{q}", brim_ring, feature(f"KeyPrism{q}", tools[owned][0]))
+    cut = feature(f"SeamCut{q}", tools[incoming][1].fuse([tools[owned][2], tools[incoming][2]]))
     keyed = boolean("Fuse", f"BrimQ{q}Keyed", quad, tongue)
     keyed.Refine = True
-    piece = boolean("Cut", f"BrimQ{q}", keyed, socket)
+    piece = boolean("Cut", f"BrimQ{q}", keyed, cut)
     piece.Refine = True
     pieces.append(piece)
 
