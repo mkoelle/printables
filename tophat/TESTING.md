@@ -41,7 +41,7 @@ Joints between hat parts.
 |-------|--------|-----------|-------------|
 | `test_joint_poc_brim` + `test_joint_poc_crown` | Quick check of the brim-to-crown joint before the full rings: a 30 deg arc with collar, snap ridge and one rib, and the matching crown base (groove, rib slot, joint zone) | Rib drops into its slot, crown arc seats flush on the brim, snap ridge engages the groove. An arc is stiffer than a ring, so expect a firmer click than the full joint | Rib binds: raise `Clr` by 0.05. Snap will not engage at all: lower `Snap` by 0.1. Then print the full rings |
 | `test_collar_ring` + `test_crown_ring` | Brim-to-crown snap and ribs | Crown ring clicks on with firm thumb pressure, only one orientation (wide rib front-right), no rotation play, pulls off with effort | Too tight or will not click: raise `Clr` by 0.05 or lower `Snap` (Advanced) by 0.1. Too loose: the opposite |
-| `tophat_hatband` + `test_crown_ring` | Hatband | Slides on from the crown's bottom end and drops to rest on the brim without wobble | Bump `Clr` by 0.05 |
+| Printed hatband (optional) + `test_crown_ring` | Hatband, only if printing it: export it with `EXPORT_HATBAND = True` | Slides on from the crown's bottom end and drops to rest on the brim without wobble | Bump `Clr` by 0.05 |
 | `test_dovetail_flat_*` | Brim seam, flat area: the rounded dovetail key (S flanks, `KeyClr` 0.1 mm), chamfered bed edges, collar-end set-back | Pieces press together by hand and hold, top surfaces flush, the seam faces touch with no light through except the thin designed line at the collar end and the coupon's cut edge | Loose: lower `KeyClr` by 0.05. Will not go in: raise it by 0.05. Pinched at the collar end: raise `SeamGap` by 0.1. Put the slicer's perimeter seam at the back or randomise it |
 | `test_dovetail_curl_*` | Brim seam, curled area; curl print quality | Same as above, and the curl underside printed cleanly | Turn on tree supports for the brim pieces |
 | `test_lip_ring` + `test_finger_tip` | CageFingers tip in the wedge lip | Tip slides onto the lip's lower edge, then wedges tight against the wall with firm push; no rattle, does not crack | Too tight: lower `LipPress` by 0.1; loose: raise it |
@@ -54,7 +54,7 @@ Joints between hat parts.
 
 ## Assembly order
 
-Glue the four brim pieces and slide the hatband on from the crown's bottom
+Glue the four brim pieces and slide the hatband (or fit the ribbon) on from the crown's bottom
 end. Fit the cage through the crown's bottom opening (crown upside down):
 squeeze the finger tips in and push the cage in until the tips tuck behind
 the lip.

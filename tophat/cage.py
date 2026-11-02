@@ -28,8 +28,11 @@ from FreeCAD import Vector as V
 
 DIR = os.path.expanduser("~/src/github.com/mkoelle/printables/tophat")
 sys.path.insert(0, DIR)
+import common
 import rail
+importlib.reload(common)
 importlib.reload(rail)
+from common import box, check, ellipse, loft, oval
 
 RAIL_COUNT = 6                     # 6: front, back + 4 at 60 deg steps
 RAIL_T = [k * 360 / RAIL_COUNT for k in range(RAIL_COUNT)]  # ellipse parameters
@@ -41,7 +44,7 @@ if "TopHat" not in App.listDocuments():
 hat = App.getDocument("TopHat")
 hat.recompute()
 sh = hat.Params
-val = lambda n: getattr(getattr(sh, n), "Value", getattr(sh, n))
+val = common.reader(sh)
 BED = val("Bed")
 CA, CB, Clr, T = val("CA"), val("CB"), val("Clr"), val("CageT")
 F, ring_h, head = val("Flare"), val("CageRingH"), val("HeadClear")
@@ -69,12 +72,7 @@ def wall_solid(inset, za=None, zb=None):
     """Solid bounded by the surface `inset` inside the crown wall."""
     za, zb = (z0 if za is None else za), (z1 if zb is None else zb)
     zs = sorted({za, max(za, min(zm, zb)), zb})
-    secs = [Part.Wire([Part.Ellipse(V(0, 0, z), *axes(z, inset)).toShape()]) for z in zs]
-    return Part.makeLoft(secs, True, True)
-
-
-def box(x0, x1, y0, y1, za, zb):
-    return Part.makeBox(x1 - x0, y1 - y0, zb - za, V(x0, y0, za))
+    return loft([ellipse(*axes(z, inset), z) for z in zs])
 
 
 def inner_point(t, z):
@@ -107,7 +105,7 @@ def head_solid(offset=0.0):
     cap = cap.transformGeometry(App.Matrix(A0, 0, 0, 0, 0, B0, 0, 0, 0, 0, head - zb, 0, 0, 0, 0, 1))
     cap.translate(V(0, 0, zb + offset))
     cap = cap.common(box(-300, 300, -300, 300, zb + offset, 400))
-    base = Part.Face(Part.Wire([Part.Ellipse(V(0, 0, 0), A0, B0).toShape()])).extrude(V(0, 0, zb + offset))
+    base = oval(A0, B0, 0, zb + offset)
     return cap.fuse(base).removeSplitter()
 
 
@@ -154,10 +152,8 @@ keep = [box(-300, 300, -300, 300, z0 - 1, z0 + ring_h)]
 keep += [ray_box(d, FINGER_W) for d in RAIL_T]
 fingers = rail.fuse([shell.common(rail.fuse(keep))] + rail_shapes)
 zc = z1 - BEVEL_H
-bevel = Part.makeLoft([
-    Part.Wire([Part.Ellipse(V(0, 0, zc), *axes(zc, T + 0.01)).toShape()]),
-    Part.Wire([Part.Ellipse(V(0, 0, z1 + 1), *axes(z1 + 1, T - BEVEL_D * (BEVEL_H + 1) / BEVEL_H)).toShape()]),
-], True, True)
+bevel = loft([ellipse(*axes(zc, T + 0.01), zc),
+              ellipse(*axes(z1 + 1, T - BEVEL_D * (BEVEL_H + 1) / BEVEL_H), z1 + 1)])
 fingers = fingers.cut(bevel)
 
 
@@ -178,6 +174,7 @@ lip = hat.CageLip.Shape
 brims = [hat.getObject(f"BrimQ{i}").Shape for i in range(1, int(val("BrimSegs")) + 1)]
 head_shape = head_solid()
 for (r, length, z_start), t, rs in zip(rails, RAIL_T, rail_shapes):
+    check(rs.common(head_solid(gap)).Volume < 0.001, f"rail t={t:.0f} clear of the head (HeadGap)")
     print(f"rail t={t:.0f}: {length:.0f} mm ({int(length // rail.PITCH)} steps, "
           f"{int(length // (rail.SLIDER_L + rail.TAB_EXT + 1))} sliders), "
           f"starts {z_start:.0f} mm, head overlap {rs.common(head_shape).Volume:.3f} / "
@@ -187,11 +184,14 @@ for (r, length, z_start), t, rs in zip(rails, RAIL_T, rail_shapes):
 def report(name, s):
     o = s.common(crown).Volume
     b = max(s.common(x).Volume for x in brims)
+    check(s.isValid() and len(s.Solids) == 1, f"{name} valid single solid")
+    check(o < 0.01 and b < 0.01, f"{name} clear of crown and brim")
     print(f"{name}: valid {s.isValid()} solids {len(s.Solids)} "
           f"{s.Volume / 1000 * 1.24:.0f} g, overlap crown {o:.3f} brim {b:.3f}")
 
 
 report("CageFingers", fingers)
+check(fingers.common(lip).Volume > 0.01, "finger tips pressed by the wedge lip")
 print(f"  wedge lip press: {fingers.common(lip).Volume:.1f} mm3 overlap "
       f"(intended, LipPress {val('LipPress'):.2f} mm)")
 print(f"  finger tip squeeze to insert {finger_squeeze():.1f} mm, "
@@ -227,9 +227,11 @@ def export(shape, name, turn=0):
     m = MeshPart.meshFromShape(Shape=s, LinearDeflection=0.05, AngularDeflection=0.1, Relative=False)
     m.write(os.path.join(DIR, "stl", f"tophat_cage_{name}.stl"))
     bb = s.optimalBoundingBox()
+    check(bb.XLength <= BED and bb.YLength <= BED, f"cage {name} fits the bed")
     print(f"  stl {name}: {bb.XLength:.1f} x {bb.YLength:.1f} x {bb.ZLength:.1f} mm "
           f"fits={bb.XLength <= BED and bb.YLength <= BED}")
 
 
 save_model("CageFingers", [("CageFingers", fingers, (0.2, 0.45, 0.75))])
 export(fingers, "fingers", turn=45)
+common.summary("cage")

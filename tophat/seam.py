@@ -124,7 +124,7 @@ def seam_tools(p, r_in, r_out):
 
 
 PARAMS = ("KeyNeck", "KeyHead", "KeyDepth", "KeyRootR", "KeyHeadR", "KeyClr", "SeamEF", "SeamGap",
-          "SeamTaper", "CollarT", "CollarH", "RimW", "BrimT", "Curl")
+          "SeamTaper", "CollarT", "CollarH", "BrimT", "Curl")
 
 
 def params(val):

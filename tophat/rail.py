@@ -14,6 +14,7 @@ backing), Z along the rail. Backing occupies y in [-BASE_T, 0].
 """
 import Part
 from FreeCAD import Vector as V
+from common import box, fuse
 
 CLR = 0.2         # rack, backing and dovetail-face clearance (sets detent engagement)
 T_CLR = 0.4       # flange side and flange-front clearance (slide-on fit)
@@ -50,16 +51,6 @@ TONGUE_T = 1.2
 
 Y_FACE = STEM_H + FLANGE_T  # flange front face (rack base)
 DEPTH_TOTAL = Y_FACE + DEPTH  # rail protrusion from backing face
-
-
-def box(x0, x1, y0, y1, z0, z1):
-    return Part.makeBox(x1 - x0, y1 - y0, z1 - z0, V(x0, y0, z0))
-
-
-def fuse(shapes):
-    """Fuse in one boolean (chained pairwise fuses can yield invalid solids)."""
-    s = shapes[0].fuse(shapes[1:]) if len(shapes) > 1 else shapes[0]
-    return s.removeSplitter()
 
 
 def tooth(y_face, z_mid, sign, width):

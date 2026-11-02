@@ -38,15 +38,22 @@ from FreeCAD import Vector as V
 
 DIR = os.path.expanduser("~/src/github.com/mkoelle/printables/tophat")
 sys.path.insert(0, DIR)
+import common
 import rail
+importlib.reload(common)
 importlib.reload(rail)
+from common import box, check, oval
+
+# Groups to build: set TEST_GROUPS (e.g. {"fixtures"}) before exec to rebuild
+# only those models; the rest keep their saved files. Consumed on each run.
+GROUPS = set(globals().pop("TEST_GROUPS", None) or ("fit", "fixtures", "rail"))
 
 if "TopHat" not in App.listDocuments():
     App.openDocument(os.path.join(DIR, "TopHat.FCStd"))
 hat = App.getDocument("TopHat")
 hat.recompute()
 sh = hat.Params
-val = lambda n: getattr(getattr(sh, n), "Value", getattr(sh, n))
+val = common.reader(sh)
 BED = val("Bed")
 SEGS = int(val("BrimSegs"))  # a multiple of 4: seams on both axes
 A0, B0, CA, CB = val("A0"), val("B0"), val("CA"), val("CB")
@@ -54,15 +61,6 @@ FONT = "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
 BrimW, BrimT, CollarH, BandH = val("BrimW"), val("BrimT"), val("CollarH"), val("BandH")
 CrownH, Wall, LipH, CageT = val("CrownH"), val("Wall"), val("LipH"), val("CageT")
 CapT = val("CapT")
-
-
-def oval(a, b, za, zb):
-    e = Part.Ellipse(V(0, 0, za), a, b).toShape()
-    return Part.Face(Part.Wire([e])).extrude(V(0, 0, zb - za))
-
-
-def box(x0, x1, y0, y1, z0, z1):
-    return Part.makeBox(x1 - x0, y1 - y0, z1 - z0, V(x0, y0, z0))
 
 
 def band(a_in, b_in, a_out, b_out, za, zb):
@@ -106,149 +104,152 @@ def add(model, name, shape, **kw):
 
 
 # --- Head fit gauges --------------------------------------------------------
-FIT = "TopHatFitTests"
-RING_T, RING_H = 2.4, 15.0       # fit ring band thickness and height
-FLANGE_W, FLANGE_T = 6.0, 1.6    # stiffening flange at the bottom
-Ka, Ease, circ = val("Ka"), val("Ease"), val("HeadCirc")
+if "fit" in GROUPS:
+    FIT = "TopHatFitTests"
+    RING_T, RING_H = 2.4, 15.0       # fit ring band thickness and height
+    FLANGE_W, FLANGE_T = 6.0, 1.6    # stiffening flange at the bottom
+    Ka, Ease, circ = val("Ka"), val("Ease"), val("HeadCirc")
 
 
-def fit_ring(c):
-    a = (c + Ease) / Ka
-    b = a * val("Oval")
-    ring = band(a, b, a + RING_T, b + RING_T, 0, RING_H).fuse(
-        band(a, b, a + RING_T + FLANGE_W, b + RING_T + FLANGE_W, 0, FLANGE_T))
-    label = text(f"{c:.0f}", 4.0, 0.6)
-    label.rotate(V(), V(0, 0, 1), 90)  # reads along the flange at the front
-    label.translate(V(a + RING_T + FLANGE_W / 2, 0, FLANGE_T - 0.6))
-    return ring.cut(label).removeSplitter()
+    def fit_ring(c):
+        a = (c + Ease) / Ka
+        b = a * val("Oval")
+        ring = band(a, b, a + RING_T, b + RING_T, 0, RING_H).fuse(
+            band(a, b, a + RING_T + FLANGE_W, b + RING_T + FLANGE_W, 0, FLANGE_T))
+        label = text(f"{c:.0f}", 4.0, 0.6)
+        label.rotate(V(), V(0, 0, 1), 90)  # reads along the flange at the front
+        label.translate(V(a + RING_T + FLANGE_W / 2, 0, FLANGE_T - 0.6))
+        return ring.cut(label).removeSplitter()
 
 
-rings = {c: add(FIT, f"fit_ring_{c:.0f}", fit_ring(c), turn=45)
-         for c in (circ - 10, circ, circ + 10)}
+    rings = {c: add(FIT, f"fit_ring_{c:.0f}", fit_ring(c), turn=45)
+             for c in (circ - 10, circ, circ + 10)}
 
-# Head gauge: flat arch in the YZ plane (thickness along X) that clips onto
-# the sides of the HeadCirc fit ring. Ruler ticks every 5 mm (long every 10)
-# are heights above the ring bottom (= brim underside), labelled every 20.
-G_T, LEG_W, BAR_H, RULER_W, FIT_CLR = 4.0, 10.0, 8.0, 6.0, 0.15
-head = val("HeadClear")
-z_lo, z_bar = 10 * round((head - 40) / 10), 10 * round((head + 30) / 10)
-leg_y = B0 + RING_T / 2
-gauge = [box(-G_T / 2, G_T / 2, -(leg_y + LEG_W / 2), leg_y + LEG_W / 2, z_bar, z_bar + BAR_H),
-         box(-G_T / 2, G_T / 2, -RULER_W / 2, RULER_W / 2, z_lo, z_bar + 0.01)]
-for sy in (-1, 1):
-    leg = box(-G_T / 2, G_T / 2, sy * leg_y - LEG_W / 2, sy * leg_y + LEG_W / 2,
-              RING_H - 10, z_bar + 0.01)
-    y0, y1 = sorted((sy * (B0 - FIT_CLR), sy * (B0 + RING_T + FIT_CLR)))
-    gauge.append(leg.cut(box(-G_T, G_T, y0, y1, RING_H - 11, RING_H)))  # fork
-gauge = rail.fuse(gauge)
-for z in range(int(z_lo) + 5, int(z_bar), 5):
-    deep = 2.0 if z % 10 == 0 else 1.0
-    gauge = gauge.cut(box(-G_T, G_T, RULER_W / 2 - deep, RULER_W, z - 0.4, z + 0.4))
-    if z % 20 == 0:
-        label = text(str(z), 3.0, 0.5)
-        label.rotate(V(), V(0, 1, 0), 90)   # onto the +X face (top when printed)
-        label.rotate(V(), V(1, 0, 0), 90)   # read along the ruler
-        label.translate(V(G_T / 2 - 0.5, -0.8, z + 3))
-        gauge = gauge.cut(label)
-add(FIT, "head_gauge", gauge, x_up=True)
+    # Head gauge: flat arch in the YZ plane (thickness along X) that clips onto
+    # the sides of the HeadCirc fit ring. Ruler ticks every 5 mm (long every 10)
+    # are heights above the ring bottom (= brim underside), labelled every 20.
+    G_T, LEG_W, BAR_H, RULER_W, FIT_CLR = 4.0, 10.0, 8.0, 6.0, 0.15
+    head = val("HeadClear")
+    z_lo, z_bar = 10 * round((head - 40) / 10), 10 * round((head + 30) / 10)
+    leg_y = B0 + RING_T / 2
+    gauge = [box(-G_T / 2, G_T / 2, -(leg_y + LEG_W / 2), leg_y + LEG_W / 2, z_bar, z_bar + BAR_H),
+             box(-G_T / 2, G_T / 2, -RULER_W / 2, RULER_W / 2, z_lo, z_bar + 0.01)]
+    for sy in (-1, 1):
+        leg = box(-G_T / 2, G_T / 2, sy * leg_y - LEG_W / 2, sy * leg_y + LEG_W / 2,
+                  RING_H - 10, z_bar + 0.01)
+        y0, y1 = sorted((sy * (B0 - FIT_CLR), sy * (B0 + RING_T + FIT_CLR)))
+        gauge.append(leg.cut(box(-G_T, G_T, y0, y1, RING_H - 11, RING_H)))  # fork
+    gauge = rail.fuse(gauge)
+    for z in range(int(z_lo) + 5, int(z_bar), 5):
+        deep = 2.0 if z % 10 == 0 else 1.0
+        gauge = gauge.cut(box(-G_T, G_T, RULER_W / 2 - deep, RULER_W, z - 0.4, z + 0.4))
+        if z % 20 == 0:
+            label = text(str(z), 3.0, 0.5)
+            label.rotate(V(), V(0, 1, 0), 90)   # onto the +X face (top when printed)
+            label.rotate(V(), V(1, 0, 0), 90)   # read along the ruler
+            label.translate(V(G_T / 2 - 0.5, -0.8, z + 3))
+            gauge = gauge.cut(label)
+    add(FIT, "head_gauge", gauge, x_up=True)
 
-sleeve_in = (RULER_W + 2 * FIT_CLR, G_T + 2 * FIT_CLR)
-pointer = box(-sleeve_in[1] / 2 - 1.6, sleeve_in[1] / 2 + 1.6,
-              -sleeve_in[0] / 2 - 1.6, sleeve_in[0] / 2 + 1.6, 0, 10).cut(
-          box(-sleeve_in[1] / 2, sleeve_in[1] / 2, -sleeve_in[0] / 2, sleeve_in[0] / 2, -1, 11))
-add(FIT, "gauge_pointer", pointer)
-pairs.append((FIT, f"fit_ring_{circ:.0f}/head_gauge", rings[circ], gauge))
-on_ruler = pointer.copy()
-on_ruler.translate(V(0, 0, z_lo + 20))
-pairs.append((FIT, "head_gauge/gauge_pointer", gauge, on_ruler))
+    sleeve_in = (RULER_W + 2 * FIT_CLR, G_T + 2 * FIT_CLR)
+    pointer = box(-sleeve_in[1] / 2 - 1.6, sleeve_in[1] / 2 + 1.6,
+                  -sleeve_in[0] / 2 - 1.6, sleeve_in[0] / 2 + 1.6, 0, 10).cut(
+              box(-sleeve_in[1] / 2, sleeve_in[1] / 2, -sleeve_in[0] / 2, sleeve_in[0] / 2, -1, 11))
+    add(FIT, "gauge_pointer", pointer)
+    pairs.append((FIT, f"fit_ring_{circ:.0f}/head_gauge", rings[circ], gauge))
+    on_ruler = pointer.copy()
+    on_ruler.translate(V(0, 0, z_lo + 20))
+    pairs.append((FIT, "head_gauge/gauge_pointer", gauge, on_ruler))
 
 # --- Fixture coupons: joints between hat parts ------------------------------
-FIX = "FixtureTests"
-collar = add(FIX, "collar_ring", hat.BrimRing.Shape.common(
-    oval(A0 + 12, B0 + 12, -1, BrimT + CollarH + 2)), turn=45)
-crown_ring = add(FIX, "crown_ring", hat.Crown.Shape.common(
-    box(-300, 300, -300, 300, -1, BrimT + BandH + 6)), flip=True, turn=45)
-pairs.append((FIX, "collar_ring/crown_ring", collar, crown_ring))
+if "fixtures" in GROUPS:
+    FIX = "FixtureTests"
+    collar = add(FIX, "collar_ring", hat.BrimRing.Shape.common(
+        oval(A0 + 12, B0 + 12, -1, BrimT + CollarH + 2)), turn=45)
+    crown_ring = add(FIX, "crown_ring", hat.Crown.Shape.common(
+        box(-300, 300, -300, 300, -1, BrimT + BandH + 6)), flip=True, turn=45)
+    pairs.append((FIX, "collar_ring/crown_ring", collar, crown_ring))
 
-# Joint proof of concept: 30 deg arc centred on the Q2 rib (ellipse t=135)
-POC_T, POC_ARC = 135, 30
-co_a, co_b = A0 + val("CollarT"), B0 + val("CollarT")
-phi = math.degrees(math.atan2(co_b * math.sin(math.radians(POC_T)),
-                              co_a * math.cos(math.radians(POC_T))))
-sector = Part.makeCylinder(300, 400, V(0, 0, -100), V(0, 0, 1), POC_ARC)
-sector.rotate(V(), V(0, 0, 1), phi - POC_ARC / 2)
-poc_brim = add(FIX, "joint_poc_brim", hat.BrimRing.Shape.common(
-    oval(A0 + 12, B0 + 12, -1, BrimT + CollarH + 2)).common(sector))
-poc_crown = add(FIX, "joint_poc_crown", hat.Crown.Shape.common(
-    box(-300, 300, -300, 300, -1, val("JointZ") + val("JointT") - Wall + 6)).common(sector), flip=True)
-pairs.append((FIX, "joint_poc", poc_brim, poc_crown))
+    # Joint proof of concept: 30 deg arc centred on the Q2 rib (ellipse t=135)
+    POC_T, POC_ARC = 135, 30
+    co_a, co_b = A0 + val("CollarT"), B0 + val("CollarT")
+    phi = math.degrees(math.atan2(co_b * math.sin(math.radians(POC_T)),
+                                  co_a * math.cos(math.radians(POC_T))))
+    sector = Part.makeCylinder(300, 400, V(0, 0, -100), V(0, 0, 1), POC_ARC)
+    sector.rotate(V(), V(0, 0, 1), phi - POC_ARC / 2)
+    poc_brim = add(FIX, "joint_poc_brim", hat.BrimRing.Shape.common(
+        oval(A0 + 12, B0 + 12, -1, BrimT + CollarH + 2)).common(sector))
+    poc_crown = add(FIX, "joint_poc_crown", hat.Crown.Shape.common(
+        box(-300, 300, -300, 300, -1, val("JointZ") + val("JointT") - Wall + 6)).common(sector), flip=True)
+    pairs.append((FIX, "joint_poc", poc_brim, poc_crown))
 
-tiles = {
-    "dovetail_flat": (box(A0 + 8, A0 + BrimW + 1, -25, 25, -5, 60), f"BrimQ{SEGS}", "BrimQ1"),
-    "dovetail_curl": (box(-25, 25, B0 + 8, B0 + BrimW + 1, -5, 60), f"BrimQ{SEGS // 4}", f"BrimQ{SEGS // 4 + 1}"),
-}
-# the coupon's cut end is a square corner the real brim does not have, so it
-# gets the same SeamGap / SeamTaper set-back as the real seam ends
-def cut_end_relief(u0, along_y):
-    g, L = val("SeamGap"), val("SeamTaper")
-    uv = [(u0 - 1, -g), (u0, -g), (u0 + L, 0), (u0, g), (u0 - 1, g), (u0 - 1, -g)]
-    pts = [V(v, u, -5) if along_y else V(u, v, -5) for u, v in uv]
-    return Part.Face(Part.makePolygon(pts)).extrude(V(0, 0, 65))
-
-
-def play(a, b, step=2.0):
-    """How far a can move in -y (pulling the seam open) before it hits b."""
-    lo, hi = 0.0, step
-    for _ in range(12):
-        m = (lo + hi) / 2
-        if a.translated(V(0, -m, 0)).common(b).Volume > 0.01:
-            hi = m
-        else:
-            lo = m
-    return lo
+    tiles = {
+        "dovetail_flat": (box(A0 + 8, A0 + BrimW + 1, -25, 25, -5, 60), f"BrimQ{SEGS}", "BrimQ1"),
+        "dovetail_curl": (box(-25, 25, B0 + 8, B0 + BrimW + 1, -5, 60), f"BrimQ{SEGS // 4}", f"BrimQ{SEGS // 4 + 1}"),
+    }
+    # the coupon's cut end is a square corner the real brim does not have, so it
+    # gets the same SeamGap / SeamTaper set-back as the real seam ends
+    def cut_end_relief(u0, along_y):
+        g, L = val("SeamGap"), val("SeamTaper")
+        uv = [(u0 - 1, -g), (u0, -g), (u0 + L, 0), (u0, g), (u0 - 1, g), (u0 - 1, -g)]
+        pts = [V(v, u, -5) if along_y else V(u, v, -5) for u, v in uv]
+        return Part.Face(Part.makePolygon(pts)).extrude(V(0, 0, 65))
 
 
-for name, (clip, tongue_part, socket_part) in tiles.items():
-    end = cut_end_relief(B0 + 8, True) if name == "dovetail_curl" else cut_end_relief(A0 + 8, False)
-    t = add(FIX, f"{name}_tongue", hat.getObject(tongue_part).Shape.common(clip).cut(end))
-    s = add(FIX, f"{name}_socket", hat.getObject(socket_part).Shape.common(clip).cut(end))
-    pairs.append((FIX, name, t, s))
-    if name == "dovetail_flat":
-        print(f"  {name}: pull-apart play {play(t, s):.2f} mm")
-
-def cage_part(model, obj):
-    if model not in App.listDocuments():
-        path = os.path.join(DIR, f"{model}.FCStd")
-        if not os.path.exists(path):
-            return None
-        App.openDocument(path)
-    o = App.getDocument(model).getObject(obj)
-    return o.Shape if o else None
+    def play(a, b, step=2.0):
+        """How far a can move in -y (pulling the seam open) before it hits b."""
+        lo, hi = 0.0, step
+        for _ in range(12):
+            m = (lo + hi) / 2
+            if a.translated(V(0, -m, 0)).common(b).Volume > 0.01:
+                hi = m
+            else:
+                lo = m
+        return lo
 
 
-z_top = CrownH - CapT
-lip_ring = add(FIX, "lip_ring", hat.Crown.Shape.common(
-    band(val("LipBotA") - CageT - 6, val("LipBotB") - CageT - 6, CA * val("Flare") + Wall + 2,
-         CB * val("Flare") + Wall + 2, z_top - LipH - 1, CrownH + 1)),
-    flip=True, turn=45)
-fingers = cage_part("CageFingers", "CageFingers")
-if fingers:
-    # front finger tip: must tuck behind the lip
-    tip = add(FIX, "finger_tip", fingers.common(
-        box(0, 300, -15, 15, val("CageZ1") - 25, CrownH)))
-    pairs.append((FIX, "lip_ring/finger_tip (wedge press, >0 intended)", lip_ring, tip))
+    for name, (clip, tongue_part, socket_part) in tiles.items():
+        end = cut_end_relief(B0 + 8, True) if name == "dovetail_curl" else cut_end_relief(A0 + 8, False)
+        t = add(FIX, f"{name}_tongue", hat.getObject(tongue_part).Shape.common(clip).cut(end))
+        s = add(FIX, f"{name}_socket", hat.getObject(socket_part).Shape.common(clip).cut(end))
+        pairs.append((FIX, name, t, s))
+        if name == "dovetail_flat":
+            print(f"  {name}: pull-apart play {play(t, s):.2f} mm")
+
+    def cage_part(model, obj):
+        if model not in App.listDocuments():
+            path = os.path.join(DIR, f"{model}.FCStd")
+            if not os.path.exists(path):
+                return None
+            App.openDocument(path)
+        o = App.getDocument(model).getObject(obj)
+        return o.Shape if o else None
+
+
+    z_top = CrownH - CapT
+    lip_ring = add(FIX, "lip_ring", hat.Crown.Shape.common(
+        band(val("LipBotA") - CageT - 6, val("LipBotB") - CageT - 6, CA * val("Flare") + Wall + 2,
+             CB * val("Flare") + Wall + 2, z_top - LipH - 1, CrownH + 1)),
+        flip=True, turn=45)
+    fingers = cage_part("CageFingers", "CageFingers")
+    if fingers:
+        # front finger tip: must tuck behind the lip
+        tip = add(FIX, "finger_tip", fingers.common(
+            box(0, 300, -15, 15, val("CageZ1") - 25, CrownH)))
+        pairs.append((FIX, "lip_ring/finger_tip (wedge press, >0 intended)", lip_ring, tip))
 
 # --- Rail and sliders -----------------------------------------------------
-RAIL_L = 50.0
-foot = box(-15, 15, -12, 12 - rail.BASE_T, 0, rail.BASE_T)
-r = rail.rail(RAIL_L)
-r.translate(V(0, 0, rail.BASE_T))
-rail_coupon = add("RailTests", "rail", rail.fuse([foot, r]))
-s = rail.slider()
-add("RailTests", "slider", s, front_down=True)
-seated = s.copy()
-seated.translate(V(0, 0, rail.BASE_T + rail.seat_offset()))
-pairs.append(("RailTests", "rail/slider seated", rail_coupon, seated))
+if "rail" in GROUPS:
+    RAIL_L = 50.0
+    foot = box(-15, 15, -12, 12 - rail.BASE_T, 0, rail.BASE_T)
+    r = rail.rail(RAIL_L)
+    r.translate(V(0, 0, rail.BASE_T))
+    rail_coupon = add("RailTests", "rail", rail.fuse([foot, r]))
+    s = rail.slider()
+    add("RailTests", "slider", s, front_down=True)
+    seated = s.copy()
+    seated.translate(V(0, 0, rail.BASE_T + rail.seat_offset()))
+    pairs.append(("RailTests", "rail/slider seated", rail_coupon, seated))
 
 # --- Models + export ------------------------------------------------------
 out = os.path.join(DIR, "stl")
@@ -273,11 +274,13 @@ for model in dict.fromkeys(c[0] for c in coupons):
         grams = src.Volume / 1000 * 1.24
         total += grams
         fits = bb.XLength <= BED and bb.YLength <= BED
+        check(src.isValid() and len(src.Solids) == 1 and fits, f"{name} valid single solid that fits")
         print(f"  {name}: valid {src.isValid()} solids {len(src.Solids)} "
               f"{bb.XLength:.1f} x {bb.YLength:.1f} x {bb.ZLength:.1f} mm fits={fits} {grams:.0f} g")
     for m_, label, a, b in pairs:
         if m_ == model:
             v = a.common(b).Volume
+            check(v > 0.01 if "intended" in label else v < 0.01, f"overlap {label} {v:.3f} mm3")
             print(f"  overlap {label}: {v:.3f} mm3" + ("" if "intended" in label else " (must be 0)"))
     doc.recompute()
     if App.GuiUp:
@@ -287,4 +290,5 @@ for model in dict.fromkeys(c[0] for c in coupons):
     doc.saveAs(os.path.join(DIR, f"{model}.FCStd"))
 
 print(f"total {total:.0f} g PLA | Clr {val('Clr'):.2f} Snap {val('Snap'):.2f} "
-      f"head opening {2 * A0:.1f} x {2 * B0:.1f} mm")
+      f"head opening {2 * A0:.1f} x {2 * B0:.1f} mm | built: {', '.join(sorted(GROUPS))}")
+common.summary("test_kit")

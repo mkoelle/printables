@@ -4,11 +4,20 @@ Each part is placed for the square bed in Params.Bed: lowest point at z=0,
 centred on the origin. Crown is flipped (top on bed); crown and hatband are
 turned 45 deg so their long oval fits the bed diagonal; each brim segment is
 turned to its smallest footprint.
-Writes to <document folder>/stl/.
+Writes to <document folder>/stl/. The hatband is a visual reference for a
+fabric band, so it is only exported when EXPORT_HATBAND is set to True
+before running this script.
 """
+import importlib
 import os
+import sys
 import FreeCAD as App
 import MeshPart
+
+sys.path.insert(0, os.path.expanduser("~/src/github.com/mkoelle/printables/tophat"))
+import common
+importlib.reload(common)
+EXPORT_HATBAND = globals().pop("EXPORT_HATBAND", False)
 
 doc = App.getDocument("TopHat")
 out = os.path.join(os.path.dirname(doc.FileName), "stl")
@@ -37,7 +46,7 @@ def best_turn(shape):
     return min(range(0, 180, 2), key=side)
 
 
-jobs = [("Crown", True, 45), ("Hatband", False, 45)] + \
+jobs = [("Crown", True, 45)] + ([("Hatband", False, 45)] if EXPORT_HATBAND else []) + \
        [(f"BrimQ{q}", False, best_turn(doc.getObject(f"BrimQ{q}").Shape)) for q in range(1, SEGS + 1)]
 for name, flip, turn in jobs:
     s = place(doc.getObject(name).Shape, flip, turn)
@@ -47,5 +56,7 @@ for name, flip, turn in jobs:
     mesh.write(path)
     bb = s.optimalBoundingBox()
     fits = bb.XLength <= BED and bb.YLength <= BED
+    common.check(fits, f"{name} fits the bed")
     print(f"{name}: {bb.XLength:.1f} x {bb.YLength:.1f} x {bb.ZLength:.1f} mm "
           f"fits={fits} -> {path}")
+common.summary("export_stl")

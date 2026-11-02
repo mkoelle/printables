@@ -15,44 +15,49 @@ Read `README.md` first (parts, files, decisions, status) and `TESTING.md`
   `xmlrpc.client.ServerProxy("http://localhost:9875").execute_code(src)`.
   FreeCAD must be running with the MCP addon's RPC server started.
 - Rebuild order: `tophat_param.py` -> save `TopHat.FCStd` -> `export_stl.py`
-  -> `cage.py` -> `test_kit.py`. `build_all.py` does all of it, but takes
-  longer than one MCP call allows (over 30 min); run the steps as separate
-  calls. `cage.py` only needs rerunning when the crown, lip or `rail.py`
-  changes.
-- `tophat_param.py` recreates `TopHat` from its parameter defaults, which
-  discards spreadsheet-only edits.
-- Some geometry is built in Python when `tophat_param.py` runs, not driven
-  by spreadsheet expressions: `BrimSegs`, the edge binding (`Rim`) and the
-  dovetail keys and seam reliefs (`KeyPrism<q>`, `SeamCut<q>`). Rerun the
-  script after changing the parameters they read.
+  -> `cage.py` -> `test_kit.py`. `build_all.py` does all of it in about
+  10 minutes (model 3.5, export 2, cage 2, tests 2). That can outlast one
+  MCP call, so run the steps as separate calls.
+- Rebuild only what a change touches. `cage.py`: only when the crown, lip,
+  head or `rail.py` changes. `test_kit.py`: set `TEST_GROUPS` (any of
+  "fit", "fixtures", "rail") in the same `execute_code` call before the
+  `exec`; fixtures alone take about 1 minute. `build_all.py` takes
+  `BUILD_STEPS` the same way. `export_stl.py` skips the hatband unless
+  `EXPORT_HATBAND = True`.
+- `tophat_param.py` is the single source of truth: it recreates `TopHat`
+  from its parameter lists and builds every part as a plain `Part::Feature`
+  shape, so spreadsheet edits do nothing. The documents keep only the
+  finished parts (`Crown`, `CrownCut`, `CageLip`, `Hatband`, `BrimRing`,
+  `BrimQ<n>`), which the other scripts read.
+- Shared code: `common.py` (shapes, `reader`, checks), `seam.py` (brim seam
+  key), `rail.py` (rails and sliders). Each script puts the folder on
+  `sys.path` and reloads them.
 
 ## Verifying a change
 
-Every script prints validity, solid count, overlaps and bed fit. After a
-change, confirm:
+Each script ends with `<script>: ALL CHECKS PASS`, or lists each failed
+check (validity, single solid, bed fit, overlaps, wedge-lip press, rail
+head clearance). Record new pass/fail conditions with `common.check`. Also:
 
-- all parts `valid True solids 1`;
-- overlaps 0, except the wedge lip / finger press, which is intended;
-- `fits=True` (`Bed`, 220 mm by default);
-- rails show no head-dome overlap;
 - for hat-wide changes, rerun at `SIZE` "S" and "XL", then reset to "M";
-- `tophat_param.py` prints the brim segment count and crown fit; it must not
-  say `DOES NOT FIT` for the size you print.
+- compare part weights with the README status when a change should not
+  alter them.
 
 ## FreeCAD gotchas found in this project
 
-- Fuse many shapes in one call (`a.fuse([b, c])`, as `rail.fuse` does).
+- Fuse many shapes in one call (`a.fuse([b, c])`, as `common.fuse` does).
   Chained pairwise fuses produced invalid solids.
-- `removeSplitter()` can break a valid solid; check `isValid()` after it.
-  The same goes for `Refine` on Part boolean features, whose default comes
-  from the user's preferences: it left `BrimRing` invalid, so `BrimSolid`
-  and `BrimRing` set `Refine = False`.
+- `removeSplitter()` can break a valid solid; check `isValid()` after it
+  (`common.refined` does). A boolean result shares geometry with its
+  inputs, and `removeSplitter()` on it left the input `CrownCut` invalid,
+  so `common.refined` and `common.fuse` work on a `copy()`. Refining the
+  brim fuse left `BrimRing` invalid, so it stays unrefined.
 - `Shape.BoundBox` is loose on refined or fused shapes; use
   `optimalBoundingBox()` for sizes and bed placement.
 - `TopoShape.rotate/translate` change the shape's Placement. When putting
   such a shape in a `Part::Feature`, multiply placements instead of setting
   `Placement.Base`.
-- FreeCAD expression trig uses degrees.
+- FreeCAD expression trig (in the Params formulas) uses degrees.
 - Engraved text uses `/System/Library/Fonts/Supplemental/Arial Bold.ttf`
   (macOS only).
 
@@ -60,7 +65,7 @@ change, confirm:
 
 - Units mm. X = front/back (long head axis), Y = sides, Z up from the brim
   underside. Ellipse parameter `t` (degrees) places features round the oval.
-- New dimensions go in the `Params` spreadsheet (`tophat_param.py`) as Main,
+- New dimensions go in the parameter lists in `tophat_param.py` as Main,
   Advanced (formula) or Derived, with a note.
 - Print orientation is set at export: crown flipped, wide oval parts turned
   45 deg, sliders front-down (tongue on the bed).
