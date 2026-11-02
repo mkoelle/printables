@@ -196,11 +196,25 @@ def cut_end_relief(u0, along_y):
     return Part.Face(Part.makePolygon(pts)).extrude(V(0, 0, 65))
 
 
+def play(a, b, step=2.0):
+    """How far a can move in -y (pulling the seam open) before it hits b."""
+    lo, hi = 0.0, step
+    for _ in range(12):
+        m = (lo + hi) / 2
+        if a.translated(V(0, -m, 0)).common(b).Volume > 0.01:
+            hi = m
+        else:
+            lo = m
+    return lo
+
+
 for name, (clip, tongue_part, socket_part) in tiles.items():
     end = cut_end_relief(B0 + 8, True) if name == "dovetail_curl" else cut_end_relief(A0 + 8, False)
     t = add(FIX, f"{name}_tongue", hat.getObject(tongue_part).Shape.common(clip).cut(end))
     s = add(FIX, f"{name}_socket", hat.getObject(socket_part).Shape.common(clip).cut(end))
     pairs.append((FIX, name, t, s))
+    if name == "dovetail_flat":
+        print(f"  {name}: pull-apart play {play(t, s):.2f} mm")
 
 def cage_part(model, obj):
     if model not in App.listDocuments():

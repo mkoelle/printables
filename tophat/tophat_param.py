@@ -15,14 +15,23 @@ interior cage (CageFingers) is built by cage.py from these Params.
 - Brim is cut into the fewest segments (a multiple of 4) that fit Bed;
   segments join with dovetail keys at each seam; keys follow the curl.
   Key corners are rounded and seam bed edges chamfered so printed corner
-  bulges cannot hold the seams open (KeyR, SeamEF, SeamGap).
+  bulges cannot hold the seams open (KeyRootR, KeyHeadR, KeyClr, SeamEF,
+  SeamGap). Key and seam geometry is in seam.py.
 - Brim carries an inner collar; the crown slides over it and seats on the brim.
 Edit the Main section of the Params spreadsheet and recompute. The segment
 count is fixed when this script runs, so rerun it after size or Bed changes.
 """
+import importlib
 import math
+import os
+import sys
 import FreeCAD as App
 import Part
+
+DIR = os.path.expanduser("~/src/github.com/mkoelle/printables/tophat")
+sys.path.insert(0, DIR)
+import seam
+importlib.reload(seam)
 
 # Head circumference presets, mm round the forehead. SIZE is a preset name or
 # a measured circumference in mm. XXL's crown needs a bed over 220 mm.
@@ -67,9 +76,11 @@ advanced = [
     ("KeyNeck",   "BrimW * 0.15",      "Dovetail neck width (at seam)"),
     ("KeyHead",   "KeyNeck * 1.6",     "Dovetail head width"),
     ("KeyDepth",  "KeyNeck * 0.8",     "Dovetail depth past seam"),
-    ("KeyR",      "1 mm",              "Dovetail corner radius (printed sharp corners bulge and hold the seam open)"),
+    ("KeyRootR",  "2 mm",              "Dovetail root rounding radius (with KeyHeadR, nearly fills the flank: S-curve flanks)"),
+    ("KeyHeadR",  "3.4 mm",            "Dovetail head rounding radius (root + head must stay under about 5.7 mm)"),
+    ("KeyClr",    "0.1 mm",            "Dovetail tongue-to-socket clearance (tighter than Clr; chosen from test prints)"),
     ("SeamEF",    "0.4 mm",            "45 deg chamfer on seam and key bed edges (elephant foot)"),
-    ("SeamGap",   "0.3 mm",            "Seam set-back per side at the seam ends (collar, edge binding), for corner bulge"),
+    ("SeamGap",   "0.3 mm",            "Seam set-back per side at the collar end (and coupon cut edges), for corner bulge"),
     ("SeamTaper", "4 mm",              "Length over which the seam set-back tapers back to contact"),
     ("RibR",      "0.8 mm",            "Alignment rib height (into crown wall slot)"),
     ("RibW",      "6 mm",              "Alignment rib width"),
@@ -442,105 +453,19 @@ brim_ring = boolean("Cut", "BrimRing", brim_solid, brim_hole)
 brim_solid.Refine = brim_ring.Refine = False
 
 # --- Dovetail keys --------------------------------------------------------
-# Seam k lies on the ray at k*360/N deg. Seam local frame: X = radial along
-# the seam, Y = across it (into segment k+1), Z up. Seam k's tongue belongs
-# to segment k and enters segment k+1. Built in Python when this script
-# runs, like the binding. Printed corners bulge (and slicers park the
-# perimeter seam on sharp corners), which held the test seams open, so:
-# key corners are rounded (KeyR; the socket follows at a Clr offset), the
-# bed edges of the seam and key carry a SeamEF chamfer, and the seam faces
-# stand SeamGap apart at both ends (where the printed corners are).
-def rounded_wire(pts, radii):
-    """Closed wire through pts (Vectors) with corner i rounded to radii[i]."""
-    n, edges, ends = len(pts), [], []
-    for i in range(n):
-        p, r = pts[i], radii[i]
-        if r <= 0:
-            ends.append((p, p, None))
-            continue
-        u = pts[i - 1] - p
-        v = pts[(i + 1) % n] - p
-        u.normalize()
-        v.normalize()
-        half = math.acos(max(-1.0, min(1.0, u.dot(v)))) / 2
-        bis = u + v
-        bis.normalize()
-        c = p + bis * (r / math.sin(half))
-        t1, t2 = p + u * (r / math.tan(half)), p + v * (r / math.tan(half))
-        ends.append((t1, t2, Part.Arc(t1, c - bis * r, t2).toShape()))
-    for i in range(n):
-        t1, t2, arc = ends[i]
-        if arc:
-            edges.append(arc)
-        nxt = ends[(i + 1) % n][0]
-        if (nxt - t2).Length > 1e-6:
-            edges.append(Part.makeLine(t2, nxt))
-    return Part.Wire(edges)
+# Seam k lies on the ray at k*360/N deg; its tongue belongs to segment k and
+# enters segment k+1. Key and seam reliefs come from seam.py, built in
+# Python when this script runs, like the binding.
 
 
-def key_outline(mid, grow):
-    """Tongue (grow 0) or socket (grow Clr) outline at z=0 in the seam frame,
-    with a strip reaching back into the owner segment."""
-    nk = val("KeyNeck") / 2 + grow
-    hk = val("KeyHead") / 2 + grow
-    d = val("KeyDepth") + grow
-    R = val("KeyR")
-    w = val("KeyHead") / 2 + 4
-    V = App.Vector
-    pts = [V(mid - w, -2, 0), V(mid + w, -2, 0), V(mid + w, 0, 0), V(mid + nk, 0, 0),
-           V(mid + hk, d, 0), V(mid - hk, d, 0), V(mid - nk, 0, 0), V(mid - w, 0, 0)]
-    # head corners convex; neck corners concave. The socket rounds both by
-    # R + Clr: at the neck the seam face itself is not offset, so a larger
-    # radius is what keeps the socket clear of the tongue.
-    radii = [0, 0, 0, R + grow, R + grow, R + grow, R + grow, 0]
-    return rounded_wire(pts, radii)
-
-
-def chamfered_prism(wire, ef, z_top):
-    """Wire extruded to z_top with a 45 deg chamfer of ef at the bed (z=0).
-    ef > 0 shrinks the bottom (a solid), ef < 0 flares it (a cutting tool)."""
-    bottom = wire.makeOffset2D(-ef, 2)
-    top = wire.translated(App.Vector(0, 0, abs(ef)))
-    foot = Part.makeLoft([bottom.translated(App.Vector(0, 0, -0.01 if ef < 0 else 0)), top], True, True)
-    body = Part.Face(top).extrude(App.Vector(0, 0, z_top - abs(ef)))
-    return foot.fuse(body).removeSplitter()
-
-
-def seam_tools(seam):
-    """Tongue solid, socket tool and seam-edge relief tool for seam k (global)."""
-    phi = seam * 360 / N
+def seam_tools(k):
+    """Tongue solid, socket tool and relief tool for seam k, placed globally."""
+    phi = k * 360 / N
     a0, b0, w = val("A0"), val("B0"), val("BrimW")
-    r_in, r_out = ray(a0, b0, phi), ray(a0 + w, b0 + w, phi)
-    mid = (r_in + val("CollarT") + r_out) / 2
-    ef, clr = val("SeamEF"), val("Clr")
-    z_top = val("Curl") + val("BrimT") + 2
-    tongue = chamfered_prism(key_outline(mid, 0), ef, z_top)
-    socket = chamfered_prism(key_outline(mid, clr), -ef, z_top)
-    # bed-edge chamfer along the straight seam either side of the key
-    V = App.Vector
-    tri = Part.Face(Part.makePolygon([V(0, -ef - 0.01, -0.01), V(0, ef + 0.01, -0.01),
-                                      V(0, 0, ef), V(0, -ef - 0.01, -0.01)]))
-    span = val("KeyNeck") / 2 + val("KeyR")  # key chamfers cover the rest
-    relief = [tri.extrude(V(mid - span - r_in + 2, 0, 0)).translated(V(r_in - 2, 0, 0)),
-              tri.extrude(V(r_out + 10 - mid - span, 0, 0)).translated(V(mid + span, 0, 0))]
-    # seam-end set-back: the seam faces stand SeamGap back from each other
-    # where the pieces end in narrow strips with square corners (collar and
-    # head opening; edge binding and its rim), so corner bulges have room,
-    # then taper back to contact over SeamTaper (too shallow to bulge)
-    g, L = val("SeamGap"), val("SeamTaper")
-    x0, x1 = r_in + val("CollarT"), r_out - val("RimW") - 1
-    zc = val("BrimT") + val("CollarH") + 2
-    relief.append(Part.Face(Part.makePolygon([
-        V(r_in - 2, -g, -1), V(x0, -g, -1), V(x0 + L, 0, -1), V(x0, g, -1),
-        V(r_in - 2, g, -1), V(r_in - 2, -g, -1)])).extrude(V(0, 0, zc + 1)))
-    relief.append(Part.Face(Part.makePolygon([
-        V(r_out + 10, -g, -1), V(x1, -g, -1), V(x1 - L, 0, -1), V(x1, g, -1),
-        V(r_out + 10, g, -1), V(r_out + 10, -g, -1)])).extrude(V(0, 0, z_top + 4)))
-    rel = relief[0].fuse(relief[1:])
-    place = rot_z(phi)
-    for sh_ in (tongue, socket, rel):
-        sh_.Placement = place.multiply(sh_.Placement)
-    return tongue, socket, rel
+    shapes = seam.seam_tools(seam.params(val), ray(a0, b0, phi), ray(a0 + w, b0 + w, phi))
+    for s_ in shapes:
+        s_.Placement = rot_z(phi).multiply(s_.Placement)
+    return shapes
 
 
 def feature(name, shape):

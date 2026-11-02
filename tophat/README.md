@@ -26,6 +26,7 @@ wall.
 | `tophat_param.py` | Builds `TopHat` (crown, brim, hatband, lip) from the `Params` spreadsheet. Parameter defaults live here |
 | `cage.py` | Builds `CageFingers` from TopHat's Params; rail count, finger width, head dome clearance |
 | `rail.py` | Shared rail and slider geometry (imported by `cage.py` and `test_kit.py`) |
+| `seam.py` | Brim seam key and seam reliefs (imported by `tophat_param.py` and `test_kit.py`) |
 | `export_stl.py` | Exports hat parts, oriented for printing |
 | `test_kit.py` | Builds the test models: `TopHatFitTests` (head fit), `FixtureTests` (joints), `RailTests` |
 | `build_all.py` | Runs everything above in order |
@@ -83,15 +84,23 @@ and `test_kit.py`).
   the dovetail test coupons stay valid). The crown is never cut (snap
   groove and lip run round it); `tophat_param.py` warns when it does not
   fit, as at XXL on a 220 mm bed.
-- **Seams close flush.** On the test prints, bulging printed corners held
-  the brim seams open. The dovetail corners are rounded (`KeyR` 1 mm;
-  sockets `KeyR` + `Clr`). The seam and key edges on the bed have a 45 deg
-  `SeamEF` chamfer for elephant foot. At both seam ends, where the pieces
-  end in narrow strips with square corners (collar, edge binding), the seam
-  faces stand `SeamGap` back from each other and taper to contact over
-  `SeamTaper`. Small notches at the ends were tried first and did not
-  help: a notch only makes two new square corners. The keys are built in
-  Python when `tophat_param.py` runs, like the binding.
+- **Seams close flush.** Bulging printed corners held the first test seams
+  open, so the brim key and seam were reworked over several coupon prints:
+  - **Key:** a dovetail whose root and head roundings (`KeyRootR` 2 mm,
+    `KeyHeadR` 3.4 mm) nearly meet, so each flank is an S of two exact arcs
+    and no corner is sharp. Clearance `KeyClr` 0.1 mm, tighter than `Clr`:
+    the curved flanks give about 2.6 x the clearance as pull-apart play, and
+    at 0.2 mm the key printed loose. At 0.1 mm (about 0.26 mm play) it held.
+  - **Bed edges:** a 45 deg `SeamEF` chamfer on the seam and key edges for
+    elephant foot.
+  - **Collar end:** the seam faces stand `SeamGap` back and taper to contact
+    over `SeamTaper`, so the collar's square corners have room to bulge.
+  - **Tried and dropped:** small end notches (they only make new corners),
+    a set-back at the edge binding, extra room past the key head, a plain
+    rounded dovetail (looser), a spline S-curve key (held, but fragile code)
+    and an S-curve with relief everywhere but under the head.
+  - The key is built in Python when `tophat_param.py` runs, like the
+    binding (`seam.py`).
 - **Thin brim with a bound edge.** `BrimT` 1.6 mm (8 layers), as in
   cad_tophat, where a brim this thin held its shape. A binding band `RimW`
   6 mm wide stands `RimT` 1.2 mm proud round the whole outer edge, like the
@@ -122,10 +131,10 @@ Test prints so far:
 
 Next:
 
-- Reprint `test_dovetail_flat_*` to check the seam set-back.
-- Print the joint test pieces (`test_joint_poc_*`), then the collar and crown
-  rings, and the lip ring with a finger tip. See `TESTING.md`.
-- Then print the full hat.
+- Brim seam key settled (coupon 5). Optional: `test_dovetail_curl_*` to check it on the curl.
+- The joint test pieces, a full crown and the collar ring fit well.
+- Print the lip ring with a finger tip. See `TESTING.md`.
+- Then print the brim and the cage.
 
 Not started: device holders that snap onto sliders.
 
