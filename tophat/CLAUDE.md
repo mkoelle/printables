@@ -28,7 +28,8 @@ Read `README.md` first (parts, files, decisions, status) and `TESTING.md`
   from its parameter lists and builds every part as a plain `Part::Feature`
   shape, so spreadsheet edits do nothing. The documents keep only the
   finished parts (`Crown`, `CrownCut`, `CageLip`, `Hatband`, `BrimRing`,
-  `BrimQ<n>`), which the other scripts read.
+  `BrimQ<n>`, and `BrimQ<n>Support`, the breakaway curl fins exported in
+  the same STL as their piece), which the other scripts read.
 - Shared code: `common.py` (shapes, `reader`, checks), `seam.py` (brim seam
   key), `rail.py` (rails and sliders). Each script puts the folder on
   `sys.path` and reloads them.

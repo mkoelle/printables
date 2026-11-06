@@ -15,8 +15,7 @@ interior cage (CageFingers) is built by cage.py from these Params.
 - Brim is cut into the fewest segments (a multiple of 4) that fit Bed;
   segments join with dovetail keys at each seam; keys follow the curl.
   Key corners are rounded and seam bed edges chamfered so printed corner
-  bulges cannot hold the seams open (KeyRootR, KeyHeadR, KeyClr, SeamEF,
-  SeamGap). Key and seam geometry is in seam.py.
+  bulges cannot hold the seams open (KeyRootR, KeyHeadR, KeyClr, SeamEF). Key and seam geometry is in seam.py.
 - Brim carries an inner collar; the crown slides over it and seats on the brim.
 This script is the single source of truth: change the main / advanced lists
 below and rerun it. The Params spreadsheet shows the values used (its
@@ -87,13 +86,18 @@ advanced = [
     ("KeyHeadR",  "3.4 mm",            "Dovetail head rounding radius (root + head must stay under about 5.7 mm)"),
     ("KeyClr",    "0.1 mm",            "Dovetail tongue-to-socket clearance (tighter than Clr; chosen from test prints)"),
     ("SeamEF",    "0.4 mm",            "45 deg chamfer on seam and key bed edges (elephant foot)"),
-    ("SeamGap",   "0.3 mm",            "Seam set-back per side at the collar end (and coupon cut edges), for corner bulge"),
-    ("SeamTaper", "4 mm",              "Length over which the seam set-back tapers back to contact"),
+    ("SeamGap",   "0.3 mm",            "Test coupons: set-back per side at the cut edge, a square corner the brim lacks"),
+    ("SeamTaper", "4 mm",              "Test coupons: length over which the cut-edge set-back tapers to contact"),
     ("RibR",      "0.8 mm",            "Alignment rib height (into crown wall slot)"),
     ("RibW",      "6 mm",              "Alignment rib width"),
     ("RibWFront", "RibW + 4 mm",       "Wide front-right rib (sets crown orientation)"),
     ("Snap",      "JointT * 0.2",      "Snap ridge height on collar"),
     ("SnapH",     "Snap * 5",          "Snap ridge height along Z"),
+    ("SupAngle",  "40",                "Curl underside flatter than this (deg from horizontal) gets breakaway fins"),
+    ("SupGap",    "0.2 mm",            "Breakaway fins: gap to the curl underside (one layer)"),
+    ("SupFin",    "0.8 mm",            "Breakaway fin thickness (two perimeters)"),
+    ("SupPitch",  "3 mm",              "Breakaway fin spacing"),
+    ("SupMinH",   "0.4 mm",            "Lowest fin worth printing; under a lower ceiling the brim gets a foot to the bed"),
     ("HeadClear", "90 mm",             "Top of head above brim underside (from the head gauge)"),
     ("HeadGap",   "10 mm",             "Space kept between the head and cage rails/sliders"),
     ("CageT",     "CollarT",           "Cage shell thickness (cage inner = head opening)"),
@@ -376,7 +380,36 @@ lip = lip_loft(0, 0).cut(lip_loft(val("CageT"), 1))
 crown = refined(crown_cut.fuse(lip))
 
 # refining these left BrimRing invalid, so they stay unrefined
-brim_ring = brim_disc.fuse([binding(), collar, snap_ring(0)] + ribs).cut(brim_hole)
+# --- Curl underside: foot and breakaway fins -----------------------------
+# The curl leaves the flat brim almost horizontally, so its underside starts
+# as a ceiling only fractions of a mm above the bed: unsupported it sags and
+# strings, and slicer supports weld to it. Where that ceiling is lower than
+# SupGap + SupMinH the brim is filled down to the bed (a foot at most 0.6 mm
+# thick); beyond it, up to where the underside is steeper than SupAngle,
+# free-standing fins stop SupGap short of the underside. The fins are
+# separate bodies exported with each piece; the piece lifts off them.
+SupGap, z_min = val("SupGap"), val("SupGap") + val("SupMinH")
+dy_foot = math.sqrt(2 * CurlR * z_min - z_min ** 2)        # ceiling reaches z_min
+dy_fin = CurlR * math.sin(math.radians(val("SupAngle")))   # underside reaches SupAngle
+z_fin = CurlR - math.sqrt(CurlR ** 2 - dy_fin ** 2)
+inside_edge = oval(A0 + BrimW - val("RimW") - 1, B0 + BrimW - val("RimW") - 1, -1, z_fin + 2)
+
+
+def below_curls(y0, y1, z1, gap):
+    """Space under both curls for CurlY0 + y0 < |y| < CurlY0 + y1, from the
+    bed to z1 and at least gap below the underside, inside the binding."""
+    axis = V(-300, CurlY0, CurlR)
+    one = box(-300, 300, CurlY0 + y0, CurlY0 + y1, 0, z1).cut(
+        Part.makeCylinder(CurlR + gap, 600, axis, V(1, 0, 0)))
+    return one.fuse(one.mirror(V(), V(0, 1, 0))).common(inside_edge)
+
+
+foot = below_curls(0, dy_foot, z_min, 0)
+pitch, fin = val("SupPitch"), val("SupFin")
+stripes = Part.makeCompound([box(x - fin / 2, x + fin / 2, -300, 300, -1, z_fin + 1)
+                             for x in [pitch * i for i in range(-int(300 / pitch), int(300 / pitch) + 1)]])
+fins = below_curls(dy_foot, dy_fin, z_fin, SupGap).common(stripes)
+brim_ring = brim_disc.fuse([binding(), collar, snap_ring(0), foot] + ribs).cut(brim_hole)
 
 # --- Dovetail keys --------------------------------------------------------
 # Seam k lies on the ray at k*360/N deg; its tongue belongs to segment k and
@@ -394,7 +427,7 @@ def seam_tools(k):
 
 
 tools = [seam_tools(k) for k in range(N)]
-pieces = []
+pieces, supports = [], []
 for q in range(1, N + 1):
     sector = Part.makeCylinder(400, 300, V(0, 0, -100), V(0, 0, 1), 360 / N)
     sector.rotate(V(), V(0, 0, 1), (q - 1) * 360 / N)
@@ -403,6 +436,9 @@ for q in range(1, N + 1):
     keyed = refined(brim_ring.common(sector).fuse(brim_ring.common(tools[owned][0])))
     cut = tools[incoming][1].fuse([tools[owned][2], tools[incoming][2]])
     pieces.append(refined(keyed.cut(cut)))
+    # fins under this piece: its sector plus its tongue, less its socket
+    region = sector.fuse(tools[owned][0]).cut(tools[incoming][1])
+    supports.append(fins.common(region))
 
 # --- Document -------------------------------------------------------------
 feature("CrownCut", crown_cut)
@@ -413,6 +449,7 @@ band_f = feature("Hatband", band, (0.45, 0.05, 0.08))
 shades = [(0.12, 0.12, 0.12), (0.22, 0.22, 0.25)]
 for q, piece in enumerate(pieces, start=1):
     feature(f"BrimQ{q}", piece, shades[(q - 1) % 2])
+    feature(f"BrimQ{q}Support", supports[q - 1], (0.6, 0.6, 0.6))
 doc.recompute()
 
 for name in ["Crown", "CrownCut", "CageLip", "BrimRing", "Hatband"] + [f"BrimQ{q}" for q in range(1, N + 1)]:
@@ -427,6 +464,12 @@ for i in range(N):
     for j in range(i + 1, N):
         o = pieces[i].common(pieces[j]).Volume
         check(o < 0.01, f"BrimQ{i + 1}/BrimQ{j + 1} overlap {o:.3f} mm3")
+for q, sup in enumerate(supports, start=1):
+    o = max(sup.common(p_).Volume for p_ in pieces)
+    check(sup.isValid() and o < 0.001, f"BrimQ{q}Support valid and clear of the brim ({o:.3f} mm3)")
+print(f"curl supports: foot to {dy_foot:.1f} mm into the curl (max {z_min:.1f} mm), fins to "
+      f"{dy_fin:.1f} mm ({z_fin:.1f} mm high), {sum(len(s_.Solids) for s_ in supports)} fins, "
+      f"{sum(s_.Volume for s_ in supports) / 1000 * 1.24:.0f} g")
 check(crown_fit <= bed, "crown fits the bed at 45 deg")
 check(side <= bed, "brim segments fit the bed")
 common.summary("tophat_param")

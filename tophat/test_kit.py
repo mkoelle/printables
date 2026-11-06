@@ -98,8 +98,10 @@ coupons = []  # (model, name, source shape, printable shape)
 pairs = []    # (model, label, shape a, shape b) that must not overlap
 
 
-def add(model, name, shape, **kw):
-    coupons.append((model, name, shape, orient(shape, **kw)))
+def add(model, name, shape, support=None, **kw):
+    """Coupon `shape`; `support` (breakaway fins) prints with it in its STL."""
+    printable = Part.makeCompound([shape, support]) if support and support.Solids else shape
+    coupons.append((model, name, shape, orient(printable, **kw)))
     return shape
 
 
@@ -188,7 +190,7 @@ if "fixtures" in GROUPS:
         "dovetail_curl": (box(-25, 25, B0 + 8, B0 + BrimW + 1, -5, 60), f"BrimQ{SEGS // 4}", f"BrimQ{SEGS // 4 + 1}"),
     }
     # the coupon's cut end is a square corner the real brim does not have, so it
-    # gets the same SeamGap / SeamTaper set-back as the real seam ends
+    # gets a SeamGap / SeamTaper set-back, tapering to contact
     def cut_end_relief(u0, along_y):
         g, L = val("SeamGap"), val("SeamTaper")
         uv = [(u0 - 1, -g), (u0, -g), (u0 + L, 0), (u0, g), (u0 - 1, g), (u0 - 1, -g)]
@@ -210,8 +212,9 @@ if "fixtures" in GROUPS:
 
     for name, (clip, tongue_part, socket_part) in tiles.items():
         end = cut_end_relief(B0 + 8, True) if name == "dovetail_curl" else cut_end_relief(A0 + 8, False)
-        t = add(FIX, f"{name}_tongue", hat.getObject(tongue_part).Shape.common(clip).cut(end))
-        s = add(FIX, f"{name}_socket", hat.getObject(socket_part).Shape.common(clip).cut(end))
+        sup = lambda part: hat.getObject(f"{part}Support").Shape.common(clip)
+        t = add(FIX, f"{name}_tongue", hat.getObject(tongue_part).Shape.common(clip).cut(end), sup(tongue_part))
+        s = add(FIX, f"{name}_socket", hat.getObject(socket_part).Shape.common(clip).cut(end), sup(socket_part))
         pairs.append((FIX, name, t, s))
         if name == "dovetail_flat":
             print(f"  {name}: pull-apart play {play(t, s):.2f} mm")

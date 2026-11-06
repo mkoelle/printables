@@ -92,14 +92,21 @@ spreadsheet changes nothing: change the lists and rerun.
     at 0.2 mm the key printed loose. At 0.1 mm (about 0.26 mm play) it held.
   - **Bed edges:** a 45 deg `SeamEF` chamfer on the seam and key edges for
     elephant foot.
-  - **Collar end:** the seam faces stand `SeamGap` back and taper to contact
-    over `SeamTaper`, so the collar's square corners have room to bulge.
   - **Tried and dropped:** small end notches (they only make new corners),
-    a set-back at the edge binding, extra room past the key head, a plain
-    rounded dovetail (looser), a spline S-curve key (held, but fragile code)
+    set-backs at the collar end and at the edge binding, extra room past
+    the key head, a plain rounded dovetail (looser), a spline S-curve key
+    (held, but fragile code)
     and an S-curve with relief everywhere but under the head.
   - The key is built in Python when `tophat_param.py` runs, like the
     binding (`seam.py`).
+- **Curl underside supports are built in.** The curl leaves the flat brim
+  almost horizontally, so its underside starts as a ceiling just above the
+  bed: unsupported it strings, and slicer tree supports welded to it. Where
+  that ceiling is under 0.6 mm the brim gets a thin foot to the bed; beyond
+  it, up to where the underside is steeper than `SupAngle` (40 deg),
+  free-standing fins (`SupFin` 0.8 mm, `SupPitch` 3 mm) stop `SupGap`
+  (one layer) short of it. They print in each brim STL as separate bodies,
+  about 4 g a piece, and snap off. Print the brim with slicer supports off.
 - **Thin brim with a bound edge.** `BrimT` 1.6 mm (8 layers), as in
   cad_tophat, where a brim this thin held its shape. A binding band `RimW`
   6 mm wide stands `RimT` 1.2 mm proud round the whole outer edge, like the
@@ -126,8 +133,8 @@ Test prints so far:
 - **Round 2**: reworked sliders on a T-rail and a dovetail rail. The
   dovetail rail was chosen.
 - **Round 3**: 12 mm sliders won (1.2 mm tongue). The brim seam coupon with
-  rounded keys still stood open: corners bulged at both seam ends. The seam
-  ends are now set back (`SeamGap`, `SeamTaper`).
+  rounded keys still stood open: corners bulged at both seam ends. Later
+  rounds settled the key (see Design decisions).
 
 Next:
 

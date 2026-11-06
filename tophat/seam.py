@@ -7,8 +7,8 @@ Python when the calling script runs, not driven by spreadsheet expressions.
 
 Printed corners bulge (and slicers park the perimeter seam on sharp
 corners), which held the test seams open, so: no key corner is sharp, the
-bed edges of the seam and key carry a SeamEF chamfer, and the seam faces
-stand SeamGap apart at the collar end (where the printed corners are).
+bed edges of the seam and key carry a SeamEF chamfer. Set-backs at the
+seam ends (collar end, edge binding) were tried and removed.
 
 The key is a dovetail whose root and head roundings (KeyRootR, KeyHeadR)
 nearly meet, so each flank is an S of two exact arcs. Chosen from test
@@ -109,22 +109,11 @@ def seam_tools(p, r_in, r_out):
                                       V(0, 0, ef), V(0, -ef - 0.01, -0.01)]))
     relief = [tri.extrude(V(mid - span - r_in + 2, 0, 0)).translated(V(r_in - 2, 0, 0)),
               tri.extrude(V(r_out + 10 - mid - span, 0, 0)).translated(V(mid + span, 0, 0))]
-    # seam-end set-back at the head opening: the seam faces stand SeamGap
-    # back from each other where the pieces end in the collar, a narrow strip
-    # with square corners, so corner bulges have room, then taper back to
-    # contact over SeamTaper (too shallow to bulge). The same set-back at the
-    # edge binding was removed after test prints showed no benefit there.
-    g, L = p["SeamGap"], p["SeamTaper"]
-    x0 = r_in + p["CollarT"]
-    zc = p["BrimT"] + p["CollarH"] + 2
-    relief.append(Part.Face(Part.makePolygon([
-        V(r_in - 2, -g, -1), V(x0, -g, -1), V(x0 + L, 0, -1), V(x0, g, -1),
-        V(r_in - 2, g, -1), V(r_in - 2, -g, -1)])).extrude(V(0, 0, zc + 1)))
     return tongue, socket, relief[0].fuse(relief[1:])
 
 
-PARAMS = ("KeyNeck", "KeyHead", "KeyDepth", "KeyRootR", "KeyHeadR", "KeyClr", "SeamEF", "SeamGap",
-          "SeamTaper", "CollarT", "CollarH", "BrimT", "Curl")
+PARAMS = ("KeyNeck", "KeyHead", "KeyDepth", "KeyRootR", "KeyHeadR", "KeyClr", "SeamEF",
+          "CollarT", "BrimT", "Curl")
 
 
 def params(val):

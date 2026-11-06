@@ -3,7 +3,8 @@
 Each part is placed for the square bed in Params.Bed: lowest point at z=0,
 centred on the origin. Crown is flipped (top on bed); crown and hatband are
 turned 45 deg so their long oval fits the bed diagonal; each brim segment is
-turned to its smallest footprint.
+turned to its smallest footprint and written with its breakaway curl fins
+(BrimQ<n>Support) in the same STL.
 Writes to <document folder>/stl/. The hatband is a visual reference for a
 fabric band, so it is only exported when EXPORT_HATBAND is set to True
 before running this script.
@@ -13,6 +14,7 @@ import os
 import sys
 import FreeCAD as App
 import MeshPart
+import Part
 
 sys.path.insert(0, os.path.expanduser("~/src/github.com/mkoelle/printables/tophat"))
 import common
@@ -49,7 +51,11 @@ def best_turn(shape):
 jobs = [("Crown", True, 45)] + ([("Hatband", False, 45)] if EXPORT_HATBAND else []) + \
        [(f"BrimQ{q}", False, best_turn(doc.getObject(f"BrimQ{q}").Shape)) for q in range(1, SEGS + 1)]
 for name, flip, turn in jobs:
-    s = place(doc.getObject(name).Shape, flip, turn)
+    shape = doc.getObject(name).Shape
+    sup = doc.getObject(f"{name}Support")
+    if sup and sup.Shape.Solids:  # breakaway fins print with the piece
+        shape = Part.makeCompound([shape, sup.Shape])
+    s = place(shape, flip, turn)
     mesh = MeshPart.meshFromShape(Shape=s, LinearDeflection=0.05,
                                   AngularDeflection=0.1, Relative=False)
     path = os.path.join(out, f"tophat_{name.lower()}.stl")

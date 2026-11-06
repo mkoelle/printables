@@ -14,7 +14,8 @@ Still to test:
 
 1. `test_lip_ring` + `test_finger_tip` (32 g): the cage finger in the wedge
    lip.
-2. Optional: `test_dovetail_curl_*` (7 g), the brim seam on the curl.
+2. `test_dovetail_curl_*` (11 g with fins): the breakaway fins under the curl,
+   printed with slicer supports off. Validates them before the full brim.
 
 Then print the brim and the cage. Reprint a settled test only after changing
 what it covers (`seam.py` or the `Key*` / `Seam*` parameters for the seam,
@@ -42,8 +43,8 @@ Joints between hat parts.
 | `test_joint_poc_brim` + `test_joint_poc_crown` | Quick check of the brim-to-crown joint before the full rings: a 30 deg arc with collar, snap ridge and one rib, and the matching crown base (groove, rib slot, joint zone) | Rib drops into its slot, crown arc seats flush on the brim, snap ridge engages the groove. An arc is stiffer than a ring, so expect a firmer click than the full joint | Rib binds: raise `Clr` by 0.05. Snap will not engage at all: lower `Snap` by 0.1. Then print the full rings |
 | `test_collar_ring` + `test_crown_ring` | Brim-to-crown snap and ribs | Crown ring clicks on with firm thumb pressure, only one orientation (wide rib front-right), no rotation play, pulls off with effort | Too tight or will not click: raise `Clr` by 0.05 or lower `Snap` (Advanced) by 0.1. Too loose: the opposite |
 | Printed hatband (optional) + `test_crown_ring` | Hatband, only if printing it: export it with `EXPORT_HATBAND = True` | Slides on from the crown's bottom end and drops to rest on the brim without wobble | Bump `Clr` by 0.05 |
-| `test_dovetail_flat_*` | Brim seam, flat area: the rounded dovetail key (S flanks, `KeyClr` 0.1 mm), chamfered bed edges, collar-end set-back | Pieces press together by hand and hold, top surfaces flush, the seam faces touch with no light through except the thin designed line at the collar end and the coupon's cut edge | Loose: lower `KeyClr` by 0.05. Will not go in: raise it by 0.05. Pinched at the collar end: raise `SeamGap` by 0.1. Put the slicer's perimeter seam at the back or randomise it |
-| `test_dovetail_curl_*` | Brim seam, curled area; curl print quality | Same as above, and the curl underside printed cleanly | Turn on tree supports for the brim pieces |
+| `test_dovetail_flat_*` | Brim seam, flat area: the rounded dovetail key (S flanks, `KeyClr` 0.1 mm), chamfered bed edges | Pieces press together by hand and hold, top surfaces flush, the seam faces touch with no light through except the thin designed line at the coupon's cut edge | Loose: lower `KeyClr` by 0.05. Will not go in: raise it by 0.05. Pinched at the collar end: the set-back there was removed; ask to restore it. Put the slicer's perimeter seam at the back or randomise it |
+| `test_dovetail_curl_*` | Brim seam, curled area; curl underside with the built-in breakaway fins and foot. Print with slicer supports off | Fins snap off by hand without marking the underside, the underside is smooth (no strings or sag), and the seam closes as on the flat coupon | Fins stuck: raise `SupGap` to 0.25-0.3 mm. Underside sags between fins: lower `SupPitch` to 2.5 mm. Sag or strings beyond the last fin: raise `SupAngle` to 45-50. Fins fall over while printing: raise `SupFin` to 1.2 mm |
 | `test_lip_ring` + `test_finger_tip` | CageFingers tip in the wedge lip | Tip slides onto the lip's lower edge, then wedges tight against the wall with firm push; no rattle, does not crack | Too tight: lower `LipPress` by 0.1; loose: raise it |
 
 ## 3. Rail (`RailTests.FCStd`)
