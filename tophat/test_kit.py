@@ -13,14 +13,12 @@ FixtureTests.FCStd: joints between hat parts
   collar_ring      brim collar band (snap ridge, ribs, 12 mm of flat brim)
   crown_ring       crown bottom (snap groove, rib slots, hatband zone),
                    printed upside down like the full crown
-                   (stl/tophat_hatband.stl is the hatband test on crown_ring)
   joint_poc_brim   small proof of concept: a 30 deg arc of the brim joint
   joint_poc_crown  (collar, snap ridge, one rib) and the matching crown base
                    (snap groove, rib slot, joint zone and step). Checks fit,
                    rib engagement and snap feel before the full rings; an
                    arc is stiffer than a ring, so the click is firmer
   dovetail_flat_*  brim seam on the front/back axis (flat brim)
-  dovetail_curl_*  brim seam on the side axis (curled brim)
   lip_ring         crown top band with the cage lip, top down
   finger_tip       CageFingers front finger tip; wedges behind lip_ring
 RailTests.FCStd: cage mounting system
@@ -33,7 +31,6 @@ import sys
 import importlib
 import FreeCAD as App
 import Part
-import MeshPart
 from FreeCAD import Vector as V
 
 DIR = os.path.expanduser("~/src/github.com/mkoelle/printables/tophat")
@@ -42,7 +39,7 @@ import common
 import rail
 importlib.reload(common)
 importlib.reload(rail)
-from common import box, check, oval
+from common import FLIP, box, check, fuse, oval, place, size, turn, write_stl
 
 # Groups to build: set TEST_GROUPS (e.g. {"fixtures"}) before exec to rebuild
 # only those models; the rest keep their saved files. Consumed on each run.
@@ -51,10 +48,8 @@ GROUPS = set(globals().pop("TEST_GROUPS", None) or ("fit", "fixtures", "rail"))
 if "TopHat" not in App.listDocuments():
     App.openDocument(os.path.join(DIR, "TopHat.FCStd"))
 hat = App.getDocument("TopHat")
-hat.recompute()
-sh = hat.Params
-val = common.reader(sh)
-BED = val("Bed")
+val = common.reader(hat.Params)
+BED, BED_H = val("Bed"), val("BedH")
 SEGS = int(val("BrimSegs"))  # a multiple of 4: seams on both axes
 A0, B0, CA, CB = val("A0"), val("B0"), val("CA"), val("CB")
 FONT = "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
@@ -77,31 +72,13 @@ def text(label, size, depth):
     return t
 
 
-def orient(shape, flip=False, turn=0, back_down=False, front_down=False, x_up=False):
-    s = shape.copy()
-    if flip:
-        s.rotate(V(), V(1, 0, 0), 180)
-    if x_up:  # flat part built in the YZ plane: lay it on the bed
-        s.rotate(V(), V(0, 1, 0), -90)
-    if back_down:  # slider back face (min y) onto the bed
-        s.rotate(V(), V(1, 0, 0), 90)
-    if front_down:  # slider front face (max y) onto the bed
-        s.rotate(V(), V(1, 0, 0), -90)
-    if turn:
-        s.rotate(V(), V(0, 0, 1), turn)
-    bb = s.optimalBoundingBox()
-    s.translate(V(-bb.Center.x, -bb.Center.y, -bb.ZMin))
-    return s
-
-
 coupons = []  # (model, name, source shape, printable shape)
 pairs = []    # (model, label, shape a, shape b) that must not overlap
 
 
-def add(model, name, shape, support=None, **kw):
-    """Coupon `shape`; `support` (breakaway fins) prints with it in its STL."""
-    printable = Part.makeCompound([shape, support]) if support and support.Solids else shape
-    coupons.append((model, name, shape, orient(printable, **kw)))
+def add(model, name, shape, *turns):
+    """Coupon `shape`, printed after place(shape, *turns)."""
+    coupons.append((model, name, shape, place(shape, *turns)))
     return shape
 
 
@@ -124,7 +101,7 @@ if "fit" in GROUPS:
         return ring.cut(label).removeSplitter()
 
 
-    rings = {c: add(FIT, f"fit_ring_{c:.0f}", fit_ring(c), turn=45)
+    rings = {c: add(FIT, f"fit_ring_{c:.0f}", fit_ring(c), turn(45))
              for c in (circ - 10, circ, circ + 10)}
 
     # Head gauge: flat arch in the YZ plane (thickness along X) that clips onto
@@ -141,7 +118,7 @@ if "fit" in GROUPS:
                   RING_H - 10, z_bar + 0.01)
         y0, y1 = sorted((sy * (B0 - FIT_CLR), sy * (B0 + RING_T + FIT_CLR)))
         gauge.append(leg.cut(box(-G_T, G_T, y0, y1, RING_H - 11, RING_H)))  # fork
-    gauge = rail.fuse(gauge)
+    gauge = fuse(gauge)
     for z in range(int(z_lo) + 5, int(z_bar), 5):
         deep = 2.0 if z % 10 == 0 else 1.0
         gauge = gauge.cut(box(-G_T, G_T, RULER_W / 2 - deep, RULER_W, z - 0.4, z + 0.4))
@@ -151,7 +128,7 @@ if "fit" in GROUPS:
             label.rotate(V(), V(1, 0, 0), 90)   # read along the ruler
             label.translate(V(G_T / 2 - 0.5, -0.8, z + 3))
             gauge = gauge.cut(label)
-    add(FIT, "head_gauge", gauge, x_up=True)
+    add(FIT, "head_gauge", gauge, (V(0, 1, 0), -90))  # built in the YZ plane: lay it flat
 
     sleeve_in = (RULER_W + 2 * FIT_CLR, G_T + 2 * FIT_CLR)
     pointer = box(-sleeve_in[1] / 2 - 1.6, sleeve_in[1] / 2 + 1.6,
@@ -167,9 +144,9 @@ if "fit" in GROUPS:
 if "fixtures" in GROUPS:
     FIX = "FixtureTests"
     collar = add(FIX, "collar_ring", hat.BrimRing.Shape.common(
-        oval(A0 + 12, B0 + 12, -1, BrimT + CollarH + 2)), turn=45)
+        oval(A0 + 12, B0 + 12, -1, BrimT + CollarH + 2)), turn(45))
     crown_ring = add(FIX, "crown_ring", hat.Crown.Shape.common(
-        box(-300, 300, -300, 300, -1, BrimT + BandH + 6)), flip=True, turn=45)
+        box(-300, 300, -300, 300, -1, BrimT + BandH + 6)), FLIP, turn(45))
     pairs.append((FIX, "collar_ring/crown_ring", collar, crown_ring))
 
     # Joint proof of concept: 30 deg arc centred on the Q2 rib (ellipse t=135)
@@ -182,19 +159,17 @@ if "fixtures" in GROUPS:
     poc_brim = add(FIX, "joint_poc_brim", hat.BrimRing.Shape.common(
         oval(A0 + 12, B0 + 12, -1, BrimT + CollarH + 2)).common(sector))
     poc_crown = add(FIX, "joint_poc_crown", hat.Crown.Shape.common(
-        box(-300, 300, -300, 300, -1, val("JointZ") + val("JointT") - Wall + 6)).common(sector), flip=True)
+        box(-300, 300, -300, 300, -1, val("JointZ") + val("JointT") - Wall + 6)).common(sector), FLIP)
     pairs.append((FIX, "joint_poc", poc_brim, poc_crown))
 
-    tiles = {
-        "dovetail_flat": (box(A0 + 8, A0 + BrimW + 1, -25, 25, -5, 60), f"BrimQ{SEGS}", "BrimQ1"),
-        "dovetail_curl": (box(-25, 25, B0 + 8, B0 + BrimW + 1, -5, 60), f"BrimQ{SEGS // 4}", f"BrimQ{SEGS // 4 + 1}"),
-    }
     # the coupon's cut end is a square corner the real brim does not have, so it
-    # gets a SeamGap / SeamTaper set-back, tapering to contact
-    def cut_end_relief(u0, along_y):
-        g, L = val("SeamGap"), val("SeamTaper")
+    # gets a set-back of SEAM_GAP a side, tapering to contact over SEAM_TAPER
+    SEAM_GAP, SEAM_TAPER = 0.3, 4.0
+
+    def cut_end_relief(u0):
+        g, L = SEAM_GAP, SEAM_TAPER
         uv = [(u0 - 1, -g), (u0, -g), (u0 + L, 0), (u0, g), (u0 - 1, g), (u0 - 1, -g)]
-        pts = [V(v, u, -5) if along_y else V(u, v, -5) for u, v in uv]
+        pts = [V(u, v, -5) for u, v in uv]
         return Part.Face(Part.makePolygon(pts)).extrude(V(0, 0, 65))
 
 
@@ -210,14 +185,13 @@ if "fixtures" in GROUPS:
         return lo
 
 
-    for name, (clip, tongue_part, socket_part) in tiles.items():
-        end = cut_end_relief(B0 + 8, True) if name == "dovetail_curl" else cut_end_relief(A0 + 8, False)
-        sup = lambda part: hat.getObject(f"{part}Support").Shape.common(clip)
-        t = add(FIX, f"{name}_tongue", hat.getObject(tongue_part).Shape.common(clip).cut(end), sup(tongue_part))
-        s = add(FIX, f"{name}_socket", hat.getObject(socket_part).Shape.common(clip).cut(end), sup(socket_part))
-        pairs.append((FIX, name, t, s))
-        if name == "dovetail_flat":
-            print(f"  {name}: pull-apart play {play(t, s):.2f} mm")
+    # brim seam on the front axis, flat brim: last piece's tongue, BrimQ1's socket
+    clip = box(A0 + 8, A0 + BrimW + 1, -25, 25, -5, 60)
+    end = cut_end_relief(A0 + 8)
+    t = add(FIX, "dovetail_flat_tongue", hat.getObject(f"BrimQ{SEGS}").Shape.common(clip).cut(end))
+    s = add(FIX, "dovetail_flat_socket", hat.BrimQ1.Shape.common(clip).cut(end))
+    pairs.append((FIX, "dovetail_flat", t, s))
+    print(f"  dovetail_flat: pull-apart play {play(t, s):.2f} mm")
 
     def cage_part(model, obj):
         if model not in App.listDocuments():
@@ -233,7 +207,7 @@ if "fixtures" in GROUPS:
     lip_ring = add(FIX, "lip_ring", hat.Crown.Shape.common(
         band(val("LipBotA") - CageT - 6, val("LipBotB") - CageT - 6, CA * val("Flare") + Wall + 2,
              CB * val("Flare") + Wall + 2, z_top - LipH - 1, CrownH + 1)),
-        flip=True, turn=45)
+        FLIP, turn(45))
     fingers = cage_part("CageFingers", "CageFingers")
     if fingers:
         # front finger tip: must tuck behind the lip
@@ -247,9 +221,9 @@ if "rail" in GROUPS:
     foot = box(-15, 15, -12, 12 - rail.BASE_T, 0, rail.BASE_T)
     r = rail.rail(RAIL_L)
     r.translate(V(0, 0, rail.BASE_T))
-    rail_coupon = add("RailTests", "rail", rail.fuse([foot, r]))
+    rail_coupon = add("RailTests", "rail", fuse([foot, r]))
     s = rail.slider()
-    add("RailTests", "slider", s, front_down=True)
+    add("RailTests", "slider", s, (V(1, 0, 0), -90))  # front face (max y) down
     seated = s.copy()
     seated.translate(V(0, 0, rail.BASE_T + rail.seat_offset()))
     pairs.append(("RailTests", "rail/slider seated", rail_coupon, seated))
@@ -271,15 +245,11 @@ for model in dict.fromkeys(c[0] for c in coupons):
         # lay out in a row, keeping the print orientation baked into s
         o.Placement = App.Placement(V(x + bb.XLength / 2, 0, 0), App.Rotation()).multiply(o.Placement)
         x += bb.XLength + 15
-        m = MeshPart.meshFromShape(Shape=s, LinearDeflection=0.02,
-                                   AngularDeflection=0.1, Relative=False)
-        m.write(os.path.join(out, f"test_{name}.stl"))
-        grams = src.Volume / 1000 * 1.24
-        total += grams
-        fits = bb.XLength <= BED and bb.YLength <= BED
-        check(src.isValid() and len(src.Solids) == 1 and fits, f"{name} valid single solid that fits")
-        print(f"  {name}: valid {src.isValid()} solids {len(src.Solids)} "
-              f"{bb.XLength:.1f} x {bb.YLength:.1f} x {bb.ZLength:.1f} mm fits={fits} {grams:.0f} g")
+        write_stl(s, os.path.join(out, f"test_{name}.stl"), name, BED, BED_H, deflection=0.02)
+        total += common.grams(src)
+        check(src.isValid() and len(src.Solids) == 1, f"{name} valid single solid")
+        print(f"  {name}: valid {src.isValid()} solids {len(src.Solids)} {size(bb)} "
+              f"{common.grams(src):.0f} g")
     for m_, label, a, b in pairs:
         if m_ == model:
             v = a.common(b).Volume

@@ -1,21 +1,23 @@
 """Parametric top hat, split into printable parts.
 
-Parts: Crown, Hatband, BrimQ1..BrimQ<BrimSegs> (brim segments). The
+Parts: Crown and BrimQ1..BrimQ<BrimSegs> (brim segments). The
 interior cage (CageFingers) is built by cage.py from these Params.
 - Head size comes from SIZE below (a preset or a measured circumference).
 - Wall thicknesses are whole nozzle perimeters (Nozzle, WallPerims).
 - Crown wall is JointT at the brim, over the snap groove and rib slots up
   to JointZ, then steps in 45 deg to Wall. The step sits under the hatband,
-  whose cone the joint zone follows.
+  (a ribbon) whose cone the joint zone follows.
 - Brim is flat beside the crown and curls up at the sides (Curl, FlatW).
   A binding band (RimW, RimT) stands proud round its outer edge, ending
   square to the sheet (also on the curls) with a rounded top (RimR) and a
   printable bottom chamfer (RimChamfer). The band is swept in Python when
   this script runs, like the segment count.
-- Brim is cut into the fewest segments (a multiple of 4) that fit Bed;
+- Brim is cut into the fewest segments (a multiple of 4) that fit the
+  printer standing on end (Bed, BedH);
   segments join with dovetail keys at each seam; keys follow the curl.
-  Key corners are rounded and seam bed edges chamfered so printed corner
-  bulges cannot hold the seams open (KeyRootR, KeyHeadR, KeyClr, SeamEF). Key and seam geometry is in seam.py.
+  Key corners are rounded so printed corner bulges cannot hold the seams
+  open (KeyRootR, KeyHeadR, KeyClr). Key geometry is in seam.py. Pieces
+  print on end, standing on their socket seam face.
 - Brim carries an inner collar; the crown slides over it and seats on the brim.
 This script is the single source of truth: change the main / advanced lists
 below and rerun it. The Params spreadsheet shows the values used (its
@@ -63,20 +65,21 @@ main = [
     ("Nozzle",   "0.4 mm", "Nozzle diameter; vertical walls are whole perimeters of it"),
     ("WallPerims", "4",    "Crown wall perimeters above the hatband (Wall = Nozzle * WallPerims)"),
     ("Clr",      "0.2 mm", "Print clearance for all fits (tune per printer)"),
-    ("Bed",      "220 mm", "Square print bed size; sets the brim segment count"),
+    ("Bed",      "220 mm", "Square print bed size; with BedH, sets the brim segment count"),
+    ("BedH",     "220 mm", "Print height limit (brim pieces print on end)"),
 ]
 advanced = [
     ("JointPerims", "7",               "Crown wall perimeters at the brim joint (JointT), under the hatband"),
     ("CapT",      "1.2 mm",            "Crown top cap thickness (6 layers, printed on the bed)"),
-    ("BrimT",     "1.6 mm",            "Brim thickness (8 layers at 0.2 mm, as cad_tophat)"),
+    ("BrimT",     "1.6 mm",            "Brim thickness, whole perimeters (pieces print on end; as cad_tophat)"),
     ("RimW",      "6 mm",              "Edge binding band width (like a grosgrain-bound brim)"),
     ("RimT",      "1.2 mm",            "Edge binding height above the brim top face"),
     ("RimR",      "1.6 mm",            "Edge binding: outer top rounding radius"),
-    ("RimChamfer", "0.6 mm",           "Edge binding: outer bottom 45 deg chamfer (prints on the bed)"),
+    ("RimChamfer", "0.6 mm",           "Edge binding: outer bottom 45 deg chamfer (softens the edge)"),
     ("CollarT",   "Nozzle * round(JointPerims * 2 / 3)", "Brim collar wall thickness (inside crown), whole perimeters"),
     ("CollarH",   "12 mm",             "Brim collar height above brim"),
-    ("BandH",     "CrownH / 5",        "Hatband height"),
-    ("BandT",     "Nozzle * 3",        "Hatband thickness, 3 perimeters"),
+    ("BandH",     "CrownH / 5",        "Hatband (ribbon) height; the crown's joint step hides under it"),
+    ("BandT",     "Nozzle * 3",        "Room for the hatband ribbon between crown and brim curl"),
     ("Ease",      "5 mm",              "Fit allowance added to circumference"),
     ("FlatW",     "6 mm",              "Flat brim margin beside crown before curl"),
     ("KeyNeck",   "BrimW * 0.15",      "Dovetail neck width (at seam)"),
@@ -85,19 +88,11 @@ advanced = [
     ("KeyRootR",  "2 mm",              "Dovetail root rounding radius (with KeyHeadR, nearly fills the flank: S-curve flanks)"),
     ("KeyHeadR",  "3.4 mm",            "Dovetail head rounding radius (root + head must stay under about 5.7 mm)"),
     ("KeyClr",    "0.1 mm",            "Dovetail tongue-to-socket clearance (tighter than Clr; chosen from test prints)"),
-    ("SeamEF",    "0.4 mm",            "45 deg chamfer on seam and key bed edges (elephant foot)"),
-    ("SeamGap",   "0.3 mm",            "Test coupons: set-back per side at the cut edge, a square corner the brim lacks"),
-    ("SeamTaper", "4 mm",              "Test coupons: length over which the cut-edge set-back tapers to contact"),
     ("RibR",      "0.8 mm",            "Alignment rib height (into crown wall slot)"),
     ("RibW",      "6 mm",              "Alignment rib width"),
     ("RibWFront", "RibW + 4 mm",       "Wide front-right rib (sets crown orientation)"),
     ("Snap",      "JointT * 0.2",      "Snap ridge height on collar"),
     ("SnapH",     "Snap * 5",          "Snap ridge height along Z"),
-    ("SupAngle",  "40",                "Curl underside flatter than this (deg from horizontal) gets breakaway fins"),
-    ("SupGap",    "0.2 mm",            "Breakaway fins: gap to the curl underside (one layer)"),
-    ("SupFin",    "0.8 mm",            "Breakaway fin thickness (two perimeters)"),
-    ("SupPitch",  "3 mm",              "Breakaway fin spacing"),
-    ("SupMinH",   "0.4 mm",            "Lowest fin worth printing; under a lower ceiling the brim gets a foot to the bed"),
     ("HeadClear", "90 mm",             "Top of head above brim underside (from the head gauge)"),
     ("HeadGap",   "10 mm",             "Space kept between the head and cage rails/sliders"),
     ("CageT",     "CollarT",           "Cage shell thickness (cage inner = head opening)"),
@@ -116,14 +111,16 @@ derived = [
     ("CA", "A0 + CollarT + Clr",     "Crown inner half-length at base"),
     ("CB", "B0 + CollarT + Clr",     "Crown inner half-width at base"),
     ("HatSizeUS", "(HeadCirc / 25.4 mm) / pi", "US hat size (inches / pi)"),
-    ("BandS", "1 + (Flare - 1) * (BandH - CollarH - 1 mm) / (CrownH - CapT - BrimT - CollarH - 1 mm)",
+    ("FlareZ", "BrimT + CollarH + 1 mm", "Crown inside is straight up to here (over the collar), then flares"),
+    ("FlareRate", "(Flare - 1) / (CrownH - CapT - FlareZ)", "Crown inner scale gained per mm above FlareZ"),
+    ("BandS", "1 + FlareRate * (BrimT + BandH - FlareZ)",
               "Crown inner scale at the hatband top (wall reaches Wall there)"),
     ("JointZ", "BrimT + CollarH + Clr + 1 mm", "Top of the thick joint zone: 1 mm above the rib slots"),
     ("JointA", "CA + JointT + (CA * BandS + Wall - CA - JointT) * (JointZ - BrimT) / BandH",
                "Crown outer half-length at JointZ (on the hatband cone)"),
     ("JointB", "CB + JointT + (CB * BandS + Wall - CB - JointT) * (JointZ - BrimT) / BandH",
                "Crown outer half-width at JointZ (on the hatband cone)"),
-    ("JointS2", "1 + (Flare - 1) * (JointZ + JointT - Wall - BrimT - CollarH - 1 mm) / (CrownH - CapT - BrimT - CollarH - 1 mm)",
+    ("JointS2", "1 + FlareRate * (JointZ + JointT - Wall - FlareZ)",
                 "Crown inner scale where the 45 deg step reaches Wall"),
     ("CrownTopA", "CA * Flare + Wall", "Crown top outer half-length"),
     ("CrownTopB", "CB * Flare + Wall", "Crown top outer half-width"),
@@ -132,12 +129,12 @@ derived = [
     ("CurlY0", "CB + JointT + Clr + BandT + FlatW", "Curl starts at |y| beyond this"),
     ("CurlD",  "B0 + BrimW - CurlY0",       "Curl run from start to side edge"),
     ("CurlR",  "(CurlD ^ 2 + Curl ^ 2) / (2 * Curl)", "Curl arc radius"),
-    ("BrimSegs", "4", "Brim segments: fewest multiple of 4 that fit Bed (set by tophat_param.py)"),
+    ("BrimSegs", "4", "Brim segments: fewest multiple of 4 that fit the printer on end (set by tophat_param.py)"),
     ("CageZ0", "BrimT + CollarH",           "Cage bottom (rests on collar top)"),
     ("CageZ1", "CrownH - CapT - Clr",       "Cage top (just under crown top)"),
-    ("LipS0",  "1 + (Flare - 1) * (CrownH - CapT - LipH - BrimT - CollarH - 1 mm) / (CrownH - CapT - BrimT - CollarH - 1 mm)",
+    ("LipS0",  "1 + FlareRate * (CrownH - CapT - LipH - FlareZ)",
                "Crown inner scale at the lip bottom"),
-    ("LipS1",  "1 + (Flare - 1) * (CrownH - CapT - 0.6 * LipH - BrimT - CollarH - 1 mm) / (CrownH - CapT - BrimT - CollarH - 1 mm)",
+    ("LipS1",  "1 + FlareRate * (CrownH - CapT - 0.6 * LipH - FlareZ)",
                "Crown inner scale where the press band starts"),
     ("LipMidA", "CA * LipS1 - CageT + LipPress", "Wedge lip outer half-length where the press band starts"),
     ("LipMidB", "CB * LipS1 - CageT + LipPress", "Wedge lip outer half-width where the press band starts"),
@@ -167,51 +164,43 @@ def ray(a, b, phi):
     return a * b / math.hypot(b * c, a * s)
 
 
-def segment_side(n, k):
-    """Smallest square (any turn on the bed) holding brim segment k of n."""
+def segment_size(n, k):
+    """Brim segment k of n stood on its socket seam face (at 360*k/n deg):
+    (length along the bed, height). Its thickness, the curl, is far less."""
     a0, b0, w = val("A0"), val("B0"), val("BrimW")
     p0, p1 = 360 * k / n, 360 * (k + 1) / n
     pts = []
     for i in range(41):
         phi = p0 + (p1 - p0) * i / 40
         for r in (ray(a0, b0, phi), ray(a0 + w, b0 + w, phi)):
-            pts.append((r * math.cos(math.radians(phi)), r * math.sin(math.radians(phi))))
+            pts.append((r * math.cos(math.radians(phi - p0)), r * math.sin(math.radians(phi - p0))))
     # dovetail tongue reaching KeyDepth past the end seam
-    c, s = math.cos(math.radians(p1)), math.sin(math.radians(p1))
+    c, s = math.cos(math.radians(p1 - p0)), math.sin(math.radians(p1 - p0))
     mid = (ray(a0, b0, p1) + val("CollarT") + ray(a0 + w, b0 + w, p1)) / 2
     for r in (mid - val("KeyHead") / 2, mid + val("KeyHead") / 2):
         pts.append((r * c - val("KeyDepth") * s, r * s + val("KeyDepth") * c))
-    best = math.inf
-    for turn in range(0, 180, 2):
-        tc, ts = math.cos(math.radians(turn)), math.sin(math.radians(turn))
-        xs = [x * tc - y * ts for x, y in pts]
-        ys = [x * ts + y * tc for x, y in pts]
-        best = min(best, max(max(xs) - min(xs), max(ys) - min(ys)))
-    return best
+    xs, ys = zip(*pts)
+    return max(xs) - min(xs), max(ys)
 
 
-bed = val("Bed")
+bed, bed_h = val("Bed"), val("BedH")
 for N in (4, 8, 12, 16):
-    side = max(segment_side(N, k) for k in range(N))
-    if side <= bed:
+    length, height = (max(v) for v in zip(*(segment_size(N, k) for k in range(N))))
+    if length <= bed and height <= bed_h:
         break
 else:
-    raise ValueError(f"brim needs more than 16 segments for a {bed:.0f} mm bed")
+    raise ValueError(f"brim needs more than 16 segments for a {bed:.0f} x {bed_h:.0f} mm printer")
 sh.set(sh.getCellFromAlias("BrimSegs"), f"={N}")
 doc.recompute()
 crown_fit = val("CrownFit45")
 print(f"size {SIZE} ({val('HeadCirc'):.0f} mm), Wall {val('Wall'):.2f} / joint {val('JointT'):.2f} mm, "
-      f"brim {N} segments ({side:.1f} mm each on a {bed:.0f} mm bed), crown at 45 deg "
+      f"brim {N} segments ({length:.1f} long, {height:.1f} mm tall on end), crown at 45 deg "
       f"{crown_fit:.1f} mm" + ("" if crown_fit <= bed else " DOES NOT FIT the bed"))
 
 # --- Geometry -------------------------------------------------------------
 # Every part is built here as a plain shape from the Params values; only the
-# finished parts go into the document (Crown, CrownCut, CageLip, Hatband,
-# BrimRing, BrimQ1..N), so cage.py, test_kit.py and export_stl.py read them.
-def rot_z(deg):
-    return App.Placement(V(), App.Rotation(V(0, 0, 1), deg))
-
-
+# finished parts go into the document (Crown, CrownCut, CageLip, BrimRing,
+# BrimQ1..N), so cage.py, test_kit.py and export_stl.py read them.
 def feature(name, shape, color=None):
     f = doc.addObject("Part::Feature", name)
     f.Shape = shape
@@ -244,17 +233,6 @@ inner = loft([
     ellipse(CA * Flare, CB * Flare, CrownH - CapT),
 ])
 crown_body = outer.cut(inner)
-
-# --- Hatband: cone over the joint zone, Clr gap inside, BandT thick -------
-# Visual reference for a fabric band (38-50 mm grosgrain); optional print.
-# Slides on from the crown's narrow bottom end before the crown meets the
-# brim; gravity seats it on the brim top.
-def band_loft(offset):
-    return loft([ellipse(CA + JointT + offset, CB + JointT + offset, BrimT),
-                 ellipse(CA * BandS + Wall + offset, CB * BandS + Wall + offset, z_band)])
-
-
-band = band_loft(Clr + val("BandT")).cut(band_loft(Clr))
 
 # --- Brim sheet: flat centre band, sides curl up along a cylinder arc ----
 # Curl arc is tangent to the flat band at |y| = CurlY0, axis parallel to X.
@@ -380,98 +358,54 @@ lip = lip_loft(0, 0).cut(lip_loft(val("CageT"), 1))
 crown = refined(crown_cut.fuse(lip))
 
 # refining these left BrimRing invalid, so they stay unrefined
-# --- Curl underside: foot and breakaway fins -----------------------------
-# The curl leaves the flat brim almost horizontally, so its underside starts
-# as a ceiling only fractions of a mm above the bed: unsupported it sags and
-# strings, and slicer supports weld to it. Where that ceiling is lower than
-# SupGap + SupMinH the brim is filled down to the bed (a foot at most 0.6 mm
-# thick); beyond it, up to where the underside is steeper than SupAngle,
-# free-standing fins stop SupGap short of the underside. The fins are
-# separate bodies exported with each piece; the piece lifts off them.
-SupGap, z_min = val("SupGap"), val("SupGap") + val("SupMinH")
-dy_foot = math.sqrt(2 * CurlR * z_min - z_min ** 2)        # ceiling reaches z_min
-dy_fin = CurlR * math.sin(math.radians(val("SupAngle")))   # underside reaches SupAngle
-z_fin = CurlR - math.sqrt(CurlR ** 2 - dy_fin ** 2)
-inside_edge = oval(A0 + BrimW - val("RimW") - 1, B0 + BrimW - val("RimW") - 1, -1, z_fin + 2)
-
-
-def below_curls(y0, y1, z1, gap):
-    """Space under both curls for CurlY0 + y0 < |y| < CurlY0 + y1, from the
-    bed to z1 and at least gap below the underside, inside the binding."""
-    axis = V(-300, CurlY0, CurlR)
-    one = box(-300, 300, CurlY0 + y0, CurlY0 + y1, 0, z1).cut(
-        Part.makeCylinder(CurlR + gap, 600, axis, V(1, 0, 0)))
-    return one.fuse(one.mirror(V(), V(0, 1, 0))).common(inside_edge)
-
-
-foot = below_curls(0, dy_foot, z_min, 0)
-pitch, fin = val("SupPitch"), val("SupFin")
-stripes = Part.makeCompound([box(x - fin / 2, x + fin / 2, -300, 300, -1, z_fin + 1)
-                             for x in [pitch * i for i in range(-int(300 / pitch), int(300 / pitch) + 1)]])
-fins = below_curls(dy_foot, dy_fin, z_fin, SupGap).common(stripes)
-brim_ring = brim_disc.fuse([binding(), collar, snap_ring(0), foot] + ribs).cut(brim_hole)
+brim_ring = brim_disc.fuse([binding(), collar, snap_ring(0)] + ribs).cut(brim_hole)
 
 # --- Dovetail keys --------------------------------------------------------
 # Seam k lies on the ray at k*360/N deg; its tongue belongs to segment k and
-# enters segment k+1. Key and seam reliefs come from seam.py.
+# enters segment k+1. Keys come from seam.py.
 P_SEAM = seam.params(val)
 
 
 def seam_tools(k):
-    """Tongue solid, socket tool and relief tool for seam k, placed globally."""
+    """Tongue solid and socket tool for seam k, placed globally."""
     phi = k * 360 / N
     shapes = seam.seam_tools(P_SEAM, ray(A0, B0, phi), ray(A0 + BrimW, B0 + BrimW, phi))
     for s_ in shapes:
-        s_.Placement = rot_z(phi).multiply(s_.Placement)
+        s_.Placement = App.Placement(V(), App.Rotation(V(0, 0, 1), phi)).multiply(s_.Placement)
     return shapes
 
 
 tools = [seam_tools(k) for k in range(N)]
-pieces, supports = [], []
+pieces = []
 for q in range(1, N + 1):
     sector = Part.makeCylinder(400, 300, V(0, 0, -100), V(0, 0, 1), 360 / N)
     sector.rotate(V(), V(0, 0, 1), (q - 1) * 360 / N)
     owned, incoming = q % N, q - 1  # seam indices
     # Keys are tall prisms clipped to the brim, so they follow the curl
     keyed = refined(brim_ring.common(sector).fuse(brim_ring.common(tools[owned][0])))
-    cut = tools[incoming][1].fuse([tools[owned][2], tools[incoming][2]])
-    pieces.append(refined(keyed.cut(cut)))
-    # fins under this piece: its sector plus its tongue, less its socket
-    region = sector.fuse(tools[owned][0]).cut(tools[incoming][1])
-    supports.append(fins.common(region))
+    pieces.append(refined(keyed.cut(tools[incoming][1])))
 
 # --- Document -------------------------------------------------------------
 feature("CrownCut", crown_cut)
 feature("CageLip", lip)
 feature("BrimRing", brim_ring)
-crown_f = feature("Crown", crown, (0.05, 0.05, 0.05))
-band_f = feature("Hatband", band, (0.45, 0.05, 0.08))
+feature("Crown", crown, (0.05, 0.05, 0.05))
 shades = [(0.12, 0.12, 0.12), (0.22, 0.22, 0.25)]
 for q, piece in enumerate(pieces, start=1):
     feature(f"BrimQ{q}", piece, shades[(q - 1) % 2])
-    feature(f"BrimQ{q}Support", supports[q - 1], (0.6, 0.6, 0.6))
 doc.recompute()
 
-for name in ["Crown", "CrownCut", "CageLip", "BrimRing", "Hatband"] + [f"BrimQ{q}" for q in range(1, N + 1)]:
+for name in ["Crown", "CrownCut", "CageLip", "BrimRing"] + [f"BrimQ{q}" for q in range(1, N + 1)]:
     s_ = doc.getObject(name).Shape
     ok = s_.isValid() and len(s_.Solids) == 1
-    print(f"{name}: valid {s_.isValid()} solids {len(s_.Solids)} {s_.Volume / 1000 * 1.24:.0f} g")
+    print(f"{name}: valid {s_.isValid()} solids {len(s_.Solids)} {common.grams(s_):.0f} g")
     check(ok, f"{name} valid single solid")
-o = band.common(crown).Volume
-print(f"overlap hatband/crown {o:.3f} mm3 (must be 0)")
-check(o < 0.01, "hatband/crown overlap")
 for i in range(N):
     for j in range(i + 1, N):
         o = pieces[i].common(pieces[j]).Volume
         check(o < 0.01, f"BrimQ{i + 1}/BrimQ{j + 1} overlap {o:.3f} mm3")
-for q, sup in enumerate(supports, start=1):
-    o = max(sup.common(p_).Volume for p_ in pieces)
-    check(sup.isValid() and o < 0.001, f"BrimQ{q}Support valid and clear of the brim ({o:.3f} mm3)")
-print(f"curl supports: foot to {dy_foot:.1f} mm into the curl (max {z_min:.1f} mm), fins to "
-      f"{dy_fin:.1f} mm ({z_fin:.1f} mm high), {sum(len(s_.Solids) for s_ in supports)} fins, "
-      f"{sum(s_.Volume for s_ in supports) / 1000 * 1.24:.0f} g")
-check(crown_fit <= bed, "crown fits the bed at 45 deg")
-check(side <= bed, "brim segments fit the bed")
+check(crown_fit <= bed and CrownH <= bed_h, "crown fits the printer at 45 deg")
+check(length <= bed and height <= bed_h, "brim segments fit the printer on end")
 common.summary("tophat_param")
 
 if App.GuiUp:

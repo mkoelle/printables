@@ -50,7 +50,6 @@ LEAD = 0.6        # lead-in chamfer at the channel mouths
 TONGUE_T = 1.2
 
 Y_FACE = STEM_H + FLANGE_T  # flange front face (rack base)
-DEPTH_TOTAL = Y_FACE + DEPTH  # rail protrusion from backing face
 
 
 def tooth(y_face, z_mid, sign, width):
@@ -74,11 +73,9 @@ def prism(half, length):
     return Part.Face(Part.makePolygon(pts + [pts[0]])).extrude(V(0, 0, length))
 
 
-def rail(length, backing=True):
-    """Rail from z=0 to z=length, rack teeth starting half a pitch up."""
-    parts = [dovetail_profile(length)]
-    if backing:
-        parts.append(box(-BASE_W / 2, BASE_W / 2, -BASE_T, 0, 0, length))
+def rail(length):
+    """Rail on its backing from z=0 to z=length, rack teeth starting half a pitch up."""
+    parts = [dovetail_profile(length), box(-BASE_W / 2, BASE_W / 2, -BASE_T, 0, 0, length)]
     n = int(length / PITCH)
     parts += [tooth(Y_FACE, PITCH / 2 + i * PITCH, +1, RACK_W) for i in range(n)]
     return fuse(parts)
@@ -93,8 +90,9 @@ def channel(y_back, y_in):
     return back + front
 
 
-def slider(tongue_t=TONGUE_T, mark=0, length=SLIDER_L):
-    """Slider at z=0..length, sitting on a rail whose backing face is y=0."""
+def slider():
+    """Slider at z=0..SLIDER_L, sitting on a rail whose backing face is y=0."""
+    length, tongue_t = SLIDER_L, TONGUE_T
     x_out = FLANGE_W / 2 + T_CLR + SIDE
     y_back, y_in = CLR, Y_FACE + DEPTH + CLR
     y_out = y_in + FRONT
@@ -138,14 +136,10 @@ def slider(tongue_t=TONGUE_T, mark=0, length=SLIDER_L):
     tw = x_out + TAB_WING
     ext = box(-hw, hw, y_out - tongue_t, y_out, length - 0.01, length + TAB_EXT)
     grip = box(-tw, tw, y_in, y_out, length + TAB_EXT - TAB_H, length + TAB_EXT)
-    body = fuse([body, post, det, ext, grip])
-    # identification notches on the right side wall
-    for i in range(mark):
-        body = body.cut(Part.makeCylinder(0.6, 2, V(x_out - 0.6, y_out - 1, 4 + i * 3), V(1, 0, 0)))
-    return body
+    return fuse([body, post, det, ext, grip])
 
 
-def seat_offset(length=SLIDER_L):
+def seat_offset():
     """Slider z offset (from rail z=0) that seats its detent in a rack valley."""
-    k = int((length - PITCH) / PITCH) + 2
-    return k * PITCH - (length - PITCH)
+    k = int((SLIDER_L - PITCH) / PITCH) + 2
+    return k * PITCH - (SLIDER_L - PITCH)

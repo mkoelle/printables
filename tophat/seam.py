@@ -1,4 +1,4 @@
-"""Brim seam key and reliefs, shared by tophat_param.py and test_kit.py (PLA).
+"""Brim seam key for tophat_param.py (PLA).
 
 Seam frame: X = radial along the seam (X=0 at the hat axis), Y = across it,
 Z up. The tongue belongs to the piece at Y < 0 and enters the piece at
@@ -6,9 +6,10 @@ Y > 0, whose socket is the tongue grown by KeyClr. Shapes are built in
 Python when the calling script runs, not driven by spreadsheet expressions.
 
 Printed corners bulge (and slicers park the perimeter seam on sharp
-corners), which held the test seams open, so: no key corner is sharp, the
-bed edges of the seam and key carry a SeamEF chamfer. Set-backs at the
-seam ends (collar end, edge binding) were tried and removed.
+corners), which held the test seams open, so no key corner is sharp.
+Set-backs at the seam ends (collar end, edge binding) and bed-edge chamfers
+for brim pieces printed flat were tried and removed; the pieces print on
+end.
 
 The key is a dovetail whose root and head roundings (KeyRootR, KeyHeadR)
 nearly meet, so each flank is an S of two exact arcs. Chosen from test
@@ -66,8 +67,7 @@ def rounded_wire(pts, radii):
 
 def key_outline(p, mid, grow):
     """Tongue (grow 0) or socket (grow KeyClr) outline at z=0, with a strip
-    reaching back into the owner piece. Returns (wire, half-width where it
-    leaves the seam)."""
+    reaching back into the owner piece."""
     nk = p["KeyNeck"] / 2 + grow
     hk = p["KeyHead"] / 2 + grow
     d = p["KeyDepth"] + grow
@@ -78,41 +78,19 @@ def key_outline(p, mid, grow):
     # r + KeyClr: at the root the seam face itself is not offset, so a larger
     # radius is what keeps the socket clear of the tongue.
     r_root, r_head = p["KeyRootR"] + grow, p["KeyHeadR"] + grow
-    radii = [0, 0, 0, r_root, r_head, r_head, r_root, 0]
-    u, v = _dirs(pts, 3)
-    leave = r_root / math.tan(math.acos(u.dot(v)) / 2)
-    return rounded_wire(pts, radii), nk + leave
-
-
-def chamfered_prism(wire, ef, z_top):
-    """Wire extruded to z_top with a 45 deg chamfer of ef at the bed (z=0).
-    ef > 0 shrinks the bottom (a solid), ef < 0 flares it (a cutting tool)."""
-    bottom = wire.makeOffset2D(-ef, 2)
-    top = wire.translated(V(0, 0, abs(ef)))
-    foot = Part.makeLoft([bottom.translated(V(0, 0, -0.01 if ef < 0 else 0)), top], True, True)
-    body = Part.Face(top).extrude(V(0, 0, z_top - abs(ef)))
-    return foot.fuse(body).removeSplitter()
+    return rounded_wire(pts, [0, 0, 0, r_root, r_head, r_head, r_root, 0])
 
 
 def seam_tools(p, r_in, r_out):
-    """Tongue solid, socket tool and seam-edge relief tool, in the seam frame,
-    for a seam from the head opening (r_in) to the brim edge (r_out)."""
+    """Tongue solid and socket tool, in the seam frame, for a seam from the
+    head opening (r_in) to the brim edge (r_out)."""
     mid = (r_in + p["CollarT"] + r_out) / 2
-    ef = p["SeamEF"]
-    z_top = p["Curl"] + p["BrimT"] + 2
-    wire, span = key_outline(p, mid, 0)
-    tongue = chamfered_prism(wire, ef, z_top)
-    socket = chamfered_prism(key_outline(p, mid, p["KeyClr"])[0], -ef, z_top)
-    # bed-edge chamfer along the straight seam either side of the key; the
-    # key chamfers cover the rest
-    tri = Part.Face(Part.makePolygon([V(0, -ef - 0.01, -0.01), V(0, ef + 0.01, -0.01),
-                                      V(0, 0, ef), V(0, -ef - 0.01, -0.01)]))
-    relief = [tri.extrude(V(mid - span - r_in + 2, 0, 0)).translated(V(r_in - 2, 0, 0)),
-              tri.extrude(V(r_out + 10 - mid - span, 0, 0)).translated(V(mid + span, 0, 0))]
-    return tongue, socket, relief[0].fuse(relief[1:])
+    z_top = V(0, 0, p["Curl"] + p["BrimT"] + 3)
+    prism = lambda grow: Part.Face(key_outline(p, mid, grow)).extrude(z_top).translated(V(0, 0, -1))
+    return prism(0), prism(p["KeyClr"])
 
 
-PARAMS = ("KeyNeck", "KeyHead", "KeyDepth", "KeyRootR", "KeyHeadR", "KeyClr", "SeamEF",
+PARAMS = ("KeyNeck", "KeyHead", "KeyDepth", "KeyRootR", "KeyHeadR", "KeyClr",
           "CollarT", "BrimT", "Curl")
 
 

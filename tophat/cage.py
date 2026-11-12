@@ -23,7 +23,6 @@ import sys
 import importlib
 import FreeCAD as App
 import Part
-import MeshPart
 from FreeCAD import Vector as V
 
 DIR = os.path.expanduser("~/src/github.com/mkoelle/printables/tophat")
@@ -32,7 +31,7 @@ import common
 import rail
 importlib.reload(common)
 importlib.reload(rail)
-from common import box, check, ellipse, loft, oval
+from common import box, check, ellipse, fuse, loft, oval, place, size, turn, write_stl
 
 RAIL_COUNT = 6                     # 6: front, back + 4 at 60 deg steps
 RAIL_T = [k * 360 / RAIL_COUNT for k in range(RAIL_COUNT)]  # ellipse parameters
@@ -42,14 +41,12 @@ BEVEL_D, BEVEL_H = 0.5, 1.0        # finger tip inner bevel: depth, height
 if "TopHat" not in App.listDocuments():
     App.openDocument(os.path.join(DIR, "TopHat.FCStd"))
 hat = App.getDocument("TopHat")
-hat.recompute()
-sh = hat.Params
-val = common.reader(sh)
-BED = val("Bed")
+val = common.reader(hat.Params)
+BED, BED_H = val("Bed"), val("BedH")
 CA, CB, Clr, T = val("CA"), val("CB"), val("Clr"), val("CageT")
-F, ring_h, head = val("Flare"), val("CageRingH"), val("HeadClear")
+ring_h, head = val("CageRingH"), val("HeadClear")
 z0, z1 = val("CageZ0"), val("CageZ1")
-zm = val("BrimT") + val("CollarH") + 1          # crown inner starts flaring
+zm, rate = val("FlareZ"), val("FlareRate")    # crown inner starts flaring
 zt = val("CrownH") - val("CapT")                # crown inner top
 lip_bot = zt - val("LipH")
 A0, B0, gap = val("A0"), val("B0"), val("HeadGap")
@@ -60,7 +57,7 @@ SLIDER_DEPTH = rail.BASE_T / 2 + rail.Y_FACE + rail.DEPTH + rail.CLR + rail.FRON
 
 def scale(z):
     """Crown inner scale at height z (straight up to zm, then linear)."""
-    return 1.0 if z <= zm else 1 + (F - 1) * (z - zm) / (zt - zm)
+    return 1 + rate * max(0.0, z - zm)
 
 
 def axes(z, inset):
@@ -150,7 +147,7 @@ rail_shapes = [r.common(outer) for r, _, _ in rails]
 # --- Bottom ring + one finger per rail -------------------------------------
 keep = [box(-300, 300, -300, 300, z0 - 1, z0 + ring_h)]
 keep += [ray_box(d, FINGER_W) for d in RAIL_T]
-fingers = rail.fuse([shell.common(rail.fuse(keep))] + rail_shapes)
+fingers = fuse([shell.common(fuse(keep))] + rail_shapes)
 zc = z1 - BEVEL_H
 bevel = loft([ellipse(*axes(zc, T + 0.01), zc),
               ellipse(*axes(z1 + 1, T - BEVEL_D * (BEVEL_H + 1) / BEVEL_H), z1 + 1)])
@@ -187,7 +184,7 @@ def report(name, s):
     check(s.isValid() and len(s.Solids) == 1, f"{name} valid single solid")
     check(o < 0.01 and b < 0.01, f"{name} clear of crown and brim")
     print(f"{name}: valid {s.isValid()} solids {len(s.Solids)} "
-          f"{s.Volume / 1000 * 1.24:.0f} g, overlap crown {o:.3f} brim {b:.3f}")
+          f"{common.grams(s):.0f} g, overlap crown {o:.3f} brim {b:.3f}")
 
 
 report("CageFingers", fingers)
@@ -218,20 +215,8 @@ def save_model(model, parts):
     doc.saveAs(os.path.join(DIR, f"{model}.FCStd"))
 
 
-def export(shape, name, turn=0):
-    s = shape.copy()
-    if turn:
-        s.rotate(V(), V(0, 0, 1), turn)
-    bb = s.optimalBoundingBox()
-    s.translate(V(-bb.Center.x, -bb.Center.y, -bb.ZMin))
-    m = MeshPart.meshFromShape(Shape=s, LinearDeflection=0.05, AngularDeflection=0.1, Relative=False)
-    m.write(os.path.join(DIR, "stl", f"tophat_cage_{name}.stl"))
-    bb = s.optimalBoundingBox()
-    check(bb.XLength <= BED and bb.YLength <= BED, f"cage {name} fits the bed")
-    print(f"  stl {name}: {bb.XLength:.1f} x {bb.YLength:.1f} x {bb.ZLength:.1f} mm "
-          f"fits={bb.XLength <= BED and bb.YLength <= BED}")
-
-
 save_model("CageFingers", [("CageFingers", fingers, (0.2, 0.45, 0.75))])
-export(fingers, "fingers", turn=45)
+bb = write_stl(place(fingers, turn(45)), os.path.join(DIR, "stl", "tophat_cage_fingers.stl"),
+               "CageFingers", BED, BED_H)
+print(f"  stl fingers: {size(bb)}")
 common.summary("cage")

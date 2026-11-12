@@ -22,23 +22,24 @@ Read `README.md` first (parts, files, decisions, status) and `TESTING.md`
   head or `rail.py` changes. `test_kit.py`: set `TEST_GROUPS` (any of
   "fit", "fixtures", "rail") in the same `execute_code` call before the
   `exec`; fixtures alone take about 1 minute. `build_all.py` takes
-  `BUILD_STEPS` the same way. `export_stl.py` skips the hatband unless
-  `EXPORT_HATBAND = True`.
+  `BUILD_STEPS` the same way.
+- The `.FCStd` models are generated and not in git (`.gitignore`). After a
+  fresh clone, run `build_all.py` before `cage.py` or `test_kit.py`.
 - `tophat_param.py` is the single source of truth: it recreates `TopHat`
   from its parameter lists and builds every part as a plain `Part::Feature`
   shape, so spreadsheet edits do nothing. The documents keep only the
-  finished parts (`Crown`, `CrownCut`, `CageLip`, `Hatband`, `BrimRing`,
-  `BrimQ<n>`, and `BrimQ<n>Support`, the breakaway curl fins exported in
-  the same STL as their piece), which the other scripts read.
-- Shared code: `common.py` (shapes, `reader`, checks), `seam.py` (brim seam
+  finished parts (`Crown`, `CrownCut`, `CageLip`, `BrimRing`,
+  `BrimQ<n>`), which the other scripts read.
+- Shared code: `common.py` (shapes, `reader`, `place` / `write_stl` for
+  print orientation and export, `grams`, checks), `seam.py` (brim seam
   key), `rail.py` (rails and sliders). Each script puts the folder on
   `sys.path` and reloads them.
 
 ## Verifying a change
 
 Each script ends with `<script>: ALL CHECKS PASS`, or lists each failed
-check (validity, single solid, bed fit, overlaps, wedge-lip press, rail
-head clearance). Record new pass/fail conditions with `common.check`. Also:
+check (validity, single solid, printer fit against `Bed` and `BedH`,
+overlaps, wedge-lip press, rail head clearance). Record new pass/fail conditions with `common.check`. Also:
 
 - for hat-wide changes, rerun at `SIZE` "S" and "XL", then reset to "M";
 - compare part weights with the README status when a change should not
@@ -68,6 +69,7 @@ head clearance). Record new pass/fail conditions with `common.check`. Also:
   underside. Ellipse parameter `t` (degrees) places features round the oval.
 - New dimensions go in the parameter lists in `tophat_param.py` as Main,
   Advanced (formula) or Derived, with a note.
-- Print orientation is set at export: crown flipped, wide oval parts turned
-  45 deg, sliders front-down (tongue on the bed).
+- Print orientation is set at export with `common.place`: crown flipped,
+  wide oval parts turned 45 deg, brim pieces stood on their socket seam
+  face, sliders front-down (tongue on the bed).
 - `.FCBak` files are FreeCAD's automatic backups.

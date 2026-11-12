@@ -4,7 +4,7 @@
 
 1. tophat_param.py  rebuild TopHat from the parameter lists in that script
 2. save TopHat.FCStd
-3. export_stl.py    hat part STLs (set EXPORT_HATBAND = True to include it)
+3. export_stl.py    hat part STLs
 4. cage.py          CageFingers model + STL (reads TopHat)
 5. test_kit.py      TopHatFitTests / FixtureTests / RailTests models + STLs
 
@@ -16,8 +16,10 @@ To rebuild only part of it, set these before exec (both are consumed):
 cage.py only needs rerunning when the crown, lip, head or rail.py changes;
 the fit and rail tests only when head size or rail.py changes.
 
-A full run takes about 10 minutes, which can outlast one MCP call; from
-Claude, run the steps as separate calls (FreeCAD finishes a timed-out call).
+The .FCStd models are not in git: after a fresh clone, run this once before
+cage.py or test_kit.py. A full run takes about 10 minutes, which can outlast
+one MCP call; from Claude, run the steps as separate calls (FreeCAD
+finishes a timed-out call).
 """
 import os
 import FreeCAD as App
