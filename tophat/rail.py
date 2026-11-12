@@ -41,13 +41,13 @@ TAB_H = 2.0       # pinch handle height at the tab end
 TAB_WING = 2.0    # pinch handle overhang past each slider side
 EF = 0.5          # elephant-foot chamfer on the bed (front) edges
 LEAD = 0.6        # lead-in chamfer at the channel mouths
-# Detent tongue thickness, chosen from the round-3 test prints (12 mm slider
-# with the 1.2 mm tongue held and released best). By the beam estimate,
+# Detent tongue thickness, chosen from the round-3 test prints: the 12 mm
+# slider with the 1.4 mm tongue (sample 3) held best. By the beam estimate,
 # strain = 3 * t * deflection / (2 * length^2) with deflection = DEPTH + CLR,
-# this short tongue reaches about 2% at a click, above the ~1% PLA guideline,
-# yet it did not crack in testing. The root taper moves the peak strain off
+# this short tongue reaches about 2.3% at a click, above the ~1% PLA
+# guideline, yet it did not crack in testing. The root taper moves the peak strain off
 # the slot corners where the first prints snapped.
-TONGUE_T = 1.2
+TONGUE_T = 1.4
 
 Y_FACE = STEM_H + FLANGE_T  # flange front face (rack base)
 

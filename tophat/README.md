@@ -56,7 +56,7 @@ spreadsheet changes nothing: change the lists and rerun.
 
 - **PLA for every part.** Flexures (slider tongues, cage fingers) are sized to
   stay under about 1% bending strain. Exception: the 12 mm slider tongue
-  (about 2% by estimate) won the round-3 prints without cracking.
+  (about 2.3% by estimate) won the round-3 prints without cracking.
 - **Nothing visible outside.** No holes, seams or ports on the crown; all
   cage features are internal. The crown prints top-down so internal features
   on its top never show.
@@ -67,7 +67,7 @@ spreadsheet changes nothing: change the lists and rerun.
   two-half cage with lap seams (heavier, more parts; dropped for the fingers).
 - **Dovetail rails** (45 deg flanks), chosen over a T-rail in the round-2
   prints: slider lips print without overhangs and the slider self-centres.
-  Sliders are 12 mm long with a 1.2 mm tongue, chosen from test prints.
+  Sliders are 12 mm long with a 1.4 mm tongue, chosen from test prints.
 - **6 rails**, evenly spaced, starting front and back. Rails stop `HeadGap`
   above a dome model of the head, so they run lower at the sides than the top
   of the head (`HeadClear`).
@@ -133,7 +133,7 @@ Test prints so far:
   The sliders were too tight and the spring tongue snapped at its root.
 - **Round 2**: reworked sliders on a T-rail and a dovetail rail. The
   dovetail rail was chosen.
-- **Round 3**: 12 mm sliders won (1.2 mm tongue). The brim seam coupon with
+- **Round 3**: 12 mm sliders won (1.4 mm tongue, sample 3). The brim seam coupon with
   rounded keys still stood open: corners bulged at both seam ends. Later
   rounds settled the key (see Design decisions).
 - **Since**: the joint test pieces, a full crown and the collar ring fit

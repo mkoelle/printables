@@ -6,7 +6,7 @@ STLs are in `stl/test_*.stl`.
 
 ## Print next
 
-Done: rail and slider (12 mm, 1.2 mm tongue), brim-to-crown
+Done: rail and slider (12 mm, 1.4 mm tongue), brim-to-crown
 joint (joint pieces, collar ring and a full crown), brim seam key (coupon 5,
 now `test_dovetail_flat_*`), a brim piece printed on end.
 
@@ -48,7 +48,7 @@ Joints between hat parts.
 
 | Print | Checks | Pass when | If it fails |
 |-------|--------|-----------|-------------|
-| `test_rail` + `test_slider` | Dovetail cage rail and the 12 mm slider with the 1.2 mm detent tongue (chosen in round 3) | Slider slides onto the rail, clicks per 2.4 mm step, holds about 50 g upside down and shaken, pinch handle pulls out to release without cracking the tongue root | Tight slide-on: raise `T_CLR`. Weak hold: lower `CLR`. Tongue cracks: lengthen `SLIDER_L` (18 mm halves the strain) or thin `TONGUE_T` |
+| `test_rail` + `test_slider` | Dovetail cage rail and the 12 mm slider with the 1.4 mm detent tongue (sample 3, chosen in round 3) | Slider slides onto the rail, clicks per 2.4 mm step, holds about 50 g upside down and shaken, pinch handle pulls out to release without cracking the tongue root | Tight slide-on: raise `T_CLR`. Weak hold: lower `CLR`. Tongue cracks: lengthen `SLIDER_L` (18 mm halves the strain) or thin `TONGUE_T` |
 
 ## Assembly order
 

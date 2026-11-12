@@ -23,7 +23,7 @@ FixtureTests.FCStd: joints between hat parts
   finger_tip       CageFingers front finger tip; wedges behind lip_ring
 RailTests.FCStd: cage mounting system
   rail             50 mm dovetail cage rail on a test foot
-  slider           12 mm slider with the 1.2 mm detent tongue, front-down
+  slider           12 mm slider with the 1.4 mm detent tongue, front-down
 """
 import math
 import os
