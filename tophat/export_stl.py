@@ -1,38 +1,35 @@
 """Export print-ready STLs from the open TopHat document.
 
-Each part is placed for a square bed (BED): lowest point at z=0,
-centred on the origin. Crown is flipped (top on bed); crown and hatband are
-turned 45 deg so their long oval fits the bed diagonal.
-Writes to <document folder>/stl/.
+Each part is placed for the printer in Params (Bed, BedH): lowest point at
+z=0, centred on the origin. Crown is flipped (top on bed) and turned 45 deg
+so its long oval fits the bed diagonal; each brim segment stands on end on
+its socket seam face (use a slicer plate brim, and slicer supports under the
+curl). Writes to <document folder>/stl/.
 """
+import importlib
 import os
+import sys
 import FreeCAD as App
-import MeshPart
+from FreeCAD import Vector as V
+
+sys.path.insert(0, os.path.expanduser("~/src/github.com/mkoelle/printables/tophat"))
+import common
+importlib.reload(common)
+from common import FLIP, place, size, turn, write_stl
 
 doc = App.getDocument("TopHat")
 out = os.path.join(os.path.dirname(doc.FileName), "stl")
 os.makedirs(out, exist_ok=True)
-BED = 220.0  # printer bed size, mm (square)
+BED, BED_H = doc.Params.Bed.Value, doc.Params.BedH.Value
+SEGS = int(doc.Params.BrimSegs)
 
-def place(shape, flip=False, turn=0):
-    s = shape.copy()
-    if flip:
-        s.rotate(App.Vector(), App.Vector(1, 0, 0), 180)
-    if turn:
-        s.rotate(App.Vector(), App.Vector(0, 0, 1), turn)
-    bb = s.optimalBoundingBox()
-    s.translate(App.Vector(-bb.Center.x, -bb.Center.y, -bb.ZMin))
-    return s
-
-jobs = [("Crown", True, 45), ("Hatband", False, 45)] + \
-       [(f"BrimQ{q}", False, 0) for q in range(1, 5)]
-for name, flip, turn in jobs:
-    s = place(doc.getObject(name).Shape, flip, turn)
-    mesh = MeshPart.meshFromShape(Shape=s, LinearDeflection=0.05,
-                                  AngularDeflection=0.1, Relative=False)
+# brim piece q spans (q-1)*360/SEGS to q*360/SEGS deg; its socket seam is the
+# first: turn that seam plane onto XZ, then stand the piece on it
+jobs = [("Crown", (FLIP, turn(45)))] + \
+       [(f"BrimQ{q}", (turn(-(q - 1) * 360 / SEGS), (V(1, 0, 0), 90))) for q in range(1, SEGS + 1)]
+for name, turns in jobs:
+    s = place(doc.getObject(name).Shape, *turns)
     path = os.path.join(out, f"tophat_{name.lower()}.stl")
-    mesh.write(path)
-    bb = s.optimalBoundingBox()
-    fits = bb.XLength <= BED and bb.YLength <= BED
-    print(f"{name}: {bb.XLength:.1f} x {bb.YLength:.1f} x {bb.ZLength:.1f} mm "
-          f"fits={fits} -> {path}")
+    bb = write_stl(s, path, name, BED, BED_H)
+    print(f"{name}: {size(bb)} -> {path}")
+common.summary("export_stl")
