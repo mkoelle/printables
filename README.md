@@ -7,7 +7,6 @@ script), STLs and docs.
 | Project | Description | Status |
 |---------|-------------|--------|
 | [tophat](tophat/) | Parametric top hat with a hidden cage for storage and IoT devices | Test prints (seam key and crown joint done; cage lip next, then the full hat) |
-| [plaguemask](plaguemask/) | Wearable full-face plague doctor mask with swappable beaks, eye inserts and trims | First model on default face values; needs measurements |
 
 ## Getting started
 
