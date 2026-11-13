@@ -81,6 +81,20 @@ def rail(length):
     return fuse(parts)
 
 
+def ramp(y_base):
+    """45 deg ramp under a rail's bottom end, so a rail standing on a wall
+    prints upright without support: the rail profile below z=0, shrinking to
+    nothing at y=y_base (the wall face) over the same distance down. It lies
+    inside the rail's own profile, so sliders still slide on from below."""
+    h = Y_FACE - y_base  # rack teeth start half a pitch up and are 45 deg already
+    prof = fuse([dovetail_profile(h), box(-BASE_W / 2, BASE_W / 2, -BASE_T, 0, 0, h)])
+    prof.translate(V(0, 0, -h))
+    x0 = -BASE_W / 2 - 1
+    pts = [V(x0, -BASE_T - 1, -h), V(x0, y_base, -h), V(x0, y_base + h, 0), V(x0, -BASE_T - 1, 0)]
+    keep = Part.Face(Part.makePolygon(pts + [pts[0]])).extrude(V(BASE_W + 2, 0, 0))
+    return prof.common(keep)
+
+
 def channel(y_back, y_in):
     """Right half of the slider's rail channel (dovetail, flange, rack band)."""
     rw, fw, sw = RACK_W / 2 + CLR, FLANGE_W / 2 + T_CLR, STEM_W / 2

@@ -12,8 +12,10 @@ RAIL_COUNT dovetail rails (see rail.py), one per finger, run from just above the
 head to just under the lip, following the wall's flare. The head is modelled
 as a dome: full opening size up to the collar top, rising to HeadClear at the
 centre. Rails stop HeadGap above that dome, measured at a seated slider's
-inner face, so they reach lower than HeadClear at the sides. The model
-includes the head dome (transparent) for reference.
+inner face, so they reach lower than HeadClear at the sides. A 45 deg ramp
+under each rail's bottom end (rail.ramp) lets it print without support;
+sliders slide on over it. The model includes the head dome (transparent)
+for reference.
 
 Re-run after changing Params. Writes build/CageFingers.FCStd and
 stl/parts/tophat_cage_fingers.stl.
@@ -122,7 +124,8 @@ def place_rail(deg):
     inward = d.cross(tan)
     inward.normalize()
     x = inward.cross(d)
-    r = rail.rail(length)
+    # the ramp under the bottom end lets the rail print without support
+    r = fuse([rail.rail(length), rail.ramp(-rail.BASE_T / 2)])
     r.translate(V(0, rail.BASE_T / 2, 0))  # backing straddles the inner face
     m = App.Matrix(x.x, inward.x, d.x, p0.x,
                    x.y, inward.y, d.y, p0.y,
