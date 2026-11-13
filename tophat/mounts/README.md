@@ -24,7 +24,9 @@ Every component stands on one rail, on the shoes in `lib/mount.py`:
 Each shoe has a plate in front of the slider, clear of its detent tongue,
 and two cheeks whose ridges snap into V grooves along the slider's sides.
 Push the component straight onto its sliders to fit it; pull it off to
-remove it. Only the locking slider holds the position, about 50 g.
+remove it. Between the two sliders the cheeks are cut back to a strip, so
+only the ridge zones flex. Only the locking slider holds the position,
+about 50 g.
 
 Print the `mount_shoe` coupon (`stl/tests/`, see `TESTING.md`) and check its
 snap before printing components.

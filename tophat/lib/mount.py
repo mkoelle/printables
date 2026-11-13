@@ -45,6 +45,8 @@ CHEEK_CLR = 0.1   # cheek to slider side
 RIDGE = 0.4       # ridge depth; the cheek flexes RIDGE + CHEEK_CLR to snap on
 TIP = 1.2         # cheek length past the ridge
 GUIDE_MIN = 36.0  # bases this tall or taller get a guide slider at the top
+CUT_GAP = 2.0     # full cheek kept past each slider end
+CUT_KEEP = 1.2    # cheek strip kept along the plate between the sliders
 
 X_CHEEK = rail.X_OUT + CHEEK_CLR
 HALF_W = X_CHEEK + CHEEK_T         # shoe half-width
@@ -77,9 +79,21 @@ def base(h=rail.SLIDER_L):
     """Plate and cheeks from z=0 to h (at least one slider long), with snap
     ridges over each slider (slider_set)."""
     parts = [box(-HALF_W, HALF_W, Y_PLATE, Y_MOUNT, 0, h)]
+    zs = slider_set(h)
     for sx in (-1, 1):
         x0, x1 = sorted((sx * X_CHEEK, sx * HALF_W))
-        parts.append(box(x0, x1, Y_TIP, Y_PLATE + 0.01, 0, h))
+        cheek = box(x0, x1, Y_TIP, Y_PLATE + 0.01, 0, h)
+        if len(zs) > 1:
+            # cut the cheek back to a strip between the sliders, so only the
+            # ridge zones flex; the cut's top edge rises at 45 deg
+            za, zb = rail.SLIDER_L + CUT_GAP, zs[1][0] - CUT_GAP
+            ys = Y_PLATE - CUT_KEEP
+            rise = ys - Y_TIP + 1
+            if zb - rise > za:
+                pts = [V(x0 - 1, Y_TIP - 1, za), V(x0 - 1, ys, za), V(x0 - 1, ys, zb - rise),
+                       V(x0 - 1, Y_TIP - 1, zb)]
+                cheek = cheek.cut(Part.Face(Part.makePolygon(pts + [pts[0]])).extrude(V(x1 - x0 + 2, 0, 0)))
+        parts.append(cheek)
         parts += [_ridge(sx, z, z + rail.SLIDER_L) for z, _ in slider_set(h)]
     return fuse(parts)
 
