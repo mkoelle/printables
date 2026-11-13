@@ -6,15 +6,21 @@ Read `README.md` first (parts, files, decisions, status) and `TESTING.md`
 ## Layout
 
 - `models/`: the scripts you run, one per build step: `hat.py` (the
-  `TopHat` model), `export.py` (hat STLs), `cage.py`, `tests.py`, and
-  `build_all.py` (all four in order).
+  `TopHat` model), `export.py` (hat STLs), `cage.py`, `tests.py`,
+  `mounts.py` (components), `layout.py` (components placed in the hat), and
+  `build_all.py` (hat to tests in order).
+- `mounts/`: one module per rail component, loaded by `mount.load`; the
+  contract is in `lib/mount.py` and `mounts/README.md`.
 - `lib/`: imported only. `common.py` (project paths, `open_model` /
   `new_model` / `save_model`, shapes, `reader`, `place` / `write_stl` for
   print orientation and export, `grams`, checks), `seam.py` (brim seam
-  key), `rail.py` (rails and sliders). Each script in `models/` puts `lib/`
+  key), `rail.py` (rails and sliders), `mount.py` (slider shoes, rail
+  frames from the cage's `Rails` sheet, the component catalogue). Import
+  `mount` after reloading `rail`: it reads `rail` when it loads. Each script in `models/` puts `lib/`
   first on `sys.path` and reloads these.
 - `build/`: generated `.FCStd` models and FreeCAD's `.FCBak` backups, not in
-  git. `stl/parts/`: the hat. `stl/tests/`: test coupons.
+  git. `stl/parts/`: the hat. `stl/tests/`: test coupons. `stl/mounts/`:
+  components.
 - Paths come from each script's own `__file__` (`common.PROJECT`), so the
   repo can live anywhere. A script must run with `__file__` set (see below).
 
@@ -32,6 +38,8 @@ Read `README.md` first (parts, files, decisions, status) and `TESTING.md`
     reruns only that step (`-f` alone forces its dependencies too)
   - `mise run tests --groups fixtures`: only some test groups (`fit`,
     `fixtures`, `rail`); fixtures alone take about 1 minute
+  - `mise run mounts`, `mise run layout`: components, and their fit in the
+    hat (edit `LAYOUT` in `models/layout.py`)
 - Run builds through mise (or `python3 ../tools/fc.py models/<script>.py`),
   not through MCP `execute_code`. `fc.py` takes a lock so two builds never
   run in FreeCAD at once, and exits non-zero on an error or failed check.

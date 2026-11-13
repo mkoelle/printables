@@ -23,7 +23,11 @@ FixtureTests.FCStd: joints between hat parts
   finger_tip       CageFingers front finger tip; wedges behind lip_ring
 RailTests.FCStd: cage mounting system
   rail             50 mm dovetail cage rail on a test foot
-  slider           12 mm slider with the 1.4 mm detent tongue, front-down
+  slider           12 mm slider with the 1.4 mm detent tongue, front-down;
+                   its tab hangs below it
+  guide            12 mm guide slider (no tongue) for the top of tall mounts
+  mount_shoe       mount base (mount.py) on a 30 x 30 mm plate: snaps onto
+                   the slider's side grooves, stands on its end
 """
 import importlib
 import math
@@ -41,6 +45,8 @@ import common
 import rail
 importlib.reload(common)
 importlib.reload(rail)
+import mount  # after rail's reload: it reads rail when it loads
+importlib.reload(mount)
 from common import FLIP, STL_TESTS, box, check, fuse, oval, place, size, turn, write_stl
 
 # Groups to build: set TEST_GROUPS (e.g. {"fixtures"}) before exec to rebuild
@@ -220,9 +226,13 @@ if "rail" in GROUPS:
     rail_coupon = add("RailTests", "rail", fuse([foot, r]))
     s = rail.slider()
     add("RailTests", "slider", s, (V(1, 0, 0), -90))  # front face (max y) down
+    add("RailTests", "guide", rail.guide(), (V(1, 0, 0), -90))
     seated = s.copy()
     seated.translate(V(0, 0, rail.BASE_T + rail.seat_offset()))
     pairs.append(("RailTests", "rail/slider seated", rail_coupon, seated))
+    # mount shoe: snaps onto the slider's side grooves; stands on its end
+    shoe = add("RailTests", "mount_shoe", fuse([mount.base(), box(-15, 15, mount.Y_PLATE, mount.Y_MOUNT, 0, 30)]))
+    pairs.append(("RailTests", "slider/mount_shoe", s, shoe))
 
 # --- Models + export ------------------------------------------------------
 total = 0.0

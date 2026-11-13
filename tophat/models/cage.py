@@ -131,7 +131,7 @@ def place_rail(deg):
                    x.y, inward.y, d.y, p0.y,
                    x.z, inward.z, d.z, p0.z,
                    0, 0, 0, 1)
-    return r.transformGeometry(m), length, z_start
+    return r.transformGeometry(m), length, z_start, m
 
 
 def ray_box(deg, width):
@@ -146,7 +146,7 @@ def ray_box(deg, width):
 outer, inner = wall_solid(0), wall_solid(T, z0 - 1, z1 + 1)
 shell = outer.cut(inner)
 rails = [place_rail(deg) for deg in RAIL_T]
-rail_shapes = [r.common(outer) for r, _, _ in rails]
+rail_shapes = [r.common(outer) for r, _, _, _ in rails]
 
 # --- Bottom ring + one finger per rail -------------------------------------
 keep = [box(-300, 300, -300, 300, z0 - 1, z0 + ring_h)]
@@ -174,12 +174,13 @@ crown = hat.CrownCut.Shape  # crown without the lip
 lip = hat.CageLip.Shape
 brims = [hat.getObject(f"BrimQ{i}").Shape for i in range(1, int(val("BrimSegs")) + 1)]
 head_shape = head_solid()
-for (r, length, z_start), t, rs in zip(rails, RAIL_T, rail_shapes):
-    check(rs.common(head_solid(gap)).Volume < 0.001, f"rail t={t:.0f} clear of the head (HeadGap)")
+keep_out = head_solid(gap)  # what rails, sliders and mounts must stay out of
+for (r, length, z_start, _), t, rs in zip(rails, RAIL_T, rail_shapes):
+    check(rs.common(keep_out).Volume < 0.001, f"rail t={t:.0f} clear of the head (HeadGap)")
     print(f"rail t={t:.0f}: {length:.0f} mm ({int(length // rail.PITCH)} steps, "
           f"{int(length // (rail.SLIDER_L + rail.TAB_EXT + 1))} sliders), "
           f"starts {z_start:.0f} mm, head overlap {rs.common(head_shape).Volume:.3f} / "
-          f"with HeadGap {rs.common(head_solid(gap)).Volume:.3f} mm3")
+          f"with HeadGap {rs.common(keep_out).Volume:.3f} mm3")
 
 
 def report(name, s):
@@ -202,13 +203,26 @@ print(f"  finger tip squeeze to insert {finger_squeeze():.1f} mm, "
 # --- Models + export -------------------------------------------------------
 def save_model(model, parts):
     doc = common.new_model(model)
-    for name, s, color in parts + [("HeadDome", head_shape, (0.85, 0.7, 0.6))]:
+    for name, s, color in parts + [("HeadDome", head_shape, (0.85, 0.7, 0.6)),
+                                   ("HeadKeepOut", keep_out, (0.9, 0.5, 0.4))]:
         o = doc.addObject("Part::Feature", name)
         o.Shape = s
         if App.GuiUp:
             o.ViewObject.ShapeColor = color
-            if name == "HeadDome":
+            if name.startswith("Head"):
                 o.ViewObject.Transparency = 75
+            if name == "HeadKeepOut":
+                o.ViewObject.Visibility = False
+    # rail frames for models/layout.py: rail-local coordinates (rail.py, with
+    # the backing moved BASE_T/2 inward) to hat coordinates
+    sheet = doc.addObject("Spreadsheet::Sheet", "Rails")
+    for col, head_ in zip("ABC", ("t", "length", "z_start")):
+        sheet.set(f"{col}1", head_)
+    sheet.set("D1", "matrix rows 1-3 (12 values)")
+    for i, ((_, length, z_start, m), t) in enumerate(zip(rails, RAIL_T), start=2):
+        values = [t, length, z_start] + list(m.A)[:12]
+        for k, v in enumerate(values):
+            sheet.set(f"{chr(65 + k)}{i}", f"{v:.9g}")
     common.save_model(doc)
 
 

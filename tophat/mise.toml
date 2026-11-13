@@ -26,12 +26,28 @@ run = "python3 ../tools/fc.py models/cage.py"
 [tasks.tests]
 description = "Test models and STLs (--groups fit,fixtures,rail)"
 depends = ["hat", "cage"]
-sources = ["models/tests.py", "lib/common.py", "lib/rail.py",
+sources = ["models/tests.py", "lib/common.py", "lib/rail.py", "lib/mount.py",
            "build/TopHat.FCStd", "build/CageFingers.FCStd"]
 outputs = ["build/TopHatFitTests.FCStd", "build/FixtureTests.FCStd", "build/RailTests.FCStd"]
 usage = 'flag "--groups <groups>" default="fit,fixtures,rail" help="Comma-separated test groups to rebuild"'
 run = "python3 ../tools/fc.py models/tests.py TEST_GROUPS=${usage_groups}"
 
+[tasks.mounts]
+description = "Components for the rail sliders (mounts/) and their STLs"
+depends = ["hat"]
+sources = ["models/mounts.py", "lib/common.py", "lib/rail.py", "lib/mount.py", "mounts/*.py",
+           "build/TopHat.FCStd"]
+outputs = ["build/Mounts.FCStd"]
+run = "python3 ../tools/fc.py models/mounts.py"
+
+[tasks.layout]
+description = "Place the components on the rails (LAYOUT in models/layout.py) and check the fit"
+depends = ["cage"]  # it builds the components itself, not from Mounts.FCStd
+sources = ["models/layout.py", "lib/common.py", "lib/rail.py", "lib/mount.py", "mounts/*.py",
+           "build/TopHat.FCStd", "build/CageFingers.FCStd"]
+outputs = ["build/Layout.FCStd"]
+run = "python3 ../tools/fc.py models/layout.py"
+
 [tasks.build]
 description = "Build the whole hat, skipping steps whose inputs did not change"
-depends = ["export", "cage", "tests"]
+depends = ["export", "cage", "tests", "mounts", "layout"]

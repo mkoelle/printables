@@ -2,16 +2,20 @@
 
 Vertical dovetail rail (45 deg flanks) with a V-tooth rack; sliders wrap
 the dovetail and hold position with a flexible detent tongue (push to step,
-pull the top tab to release). Chosen over a T-rail after test prints: the
+pull the tab, which hangs below the slider, to release). Guide sliders
+(no tongue) steady the top of tall mounts. Chosen over a T-rail after test prints: the
 slider lips print without flat overhangs and the slider self-centres.
 
 Sliders print front-down: the tongue lies on the bed (bending runs along
 the layer lines) and the detent tooth stands on a post, apex up. Front
-edges carry an elephant-foot chamfer; channel mouths have a lead-in.
+edges carry an elephant-foot chamfer; channel mouths have a lead-in. A V
+groove along each side takes the snap ridges of mount shoes (mount.py).
 
 Rail local frame: X across the rail, Y toward the slider (away from the
 backing), Z along the rail. Backing occupies y in [-BASE_T, 0].
 """
+import math
+
 import Part
 from FreeCAD import Vector as V
 from common import box, fuse
@@ -40,6 +44,8 @@ TAB_EXT = 3.0     # tongue extension above slider top (release tab)
 TAB_H = 2.0       # pinch handle height at the tab end
 TAB_WING = 2.0    # pinch handle overhang past each slider side
 EF = 0.5          # elephant-foot chamfer on the bed (front) edges
+GROOVE_Y = 3.0    # V groove along each slider side, where mount shoes snap on (mount.py)
+GROOVE_D = 0.5    # its depth (45 deg flanks)
 LEAD = 0.6        # lead-in chamfer at the channel mouths
 # Detent tongue thickness, chosen from the round-3 test prints: the 12 mm
 # slider with the 1.4 mm tongue (sample 3) held best. By the beam estimate,
@@ -50,6 +56,8 @@ LEAD = 0.6        # lead-in chamfer at the channel mouths
 TONGUE_T = 1.4
 
 Y_FACE = STEM_H + FLANGE_T  # flange front face (rack base)
+X_OUT = FLANGE_W / 2 + T_CLR + SIDE          # slider side face
+Y_OUT = Y_FACE + DEPTH + CLR + FRONT         # slider front face
 
 
 def tooth(y_face, z_mid, sign, width):
@@ -73,9 +81,14 @@ def prism(half, length):
     return Part.Face(Part.makePolygon(pts + [pts[0]])).extrude(V(0, 0, length))
 
 
+def _plain_rail(length):
+    """Dovetail on its backing, z=0 to length, without rack teeth."""
+    return [dovetail_profile(length), box(-BASE_W / 2, BASE_W / 2, -BASE_T, 0, 0, length)]
+
+
 def rail(length):
     """Rail on its backing from z=0 to z=length, rack teeth starting half a pitch up."""
-    parts = [dovetail_profile(length), box(-BASE_W / 2, BASE_W / 2, -BASE_T, 0, 0, length)]
+    parts = _plain_rail(length)
     n = int(length / PITCH)
     parts += [tooth(Y_FACE, PITCH / 2 + i * PITCH, +1, RACK_W) for i in range(n)]
     return fuse(parts)
@@ -87,7 +100,7 @@ def ramp(y_base):
     nothing at y=y_base (the wall face) over the same distance down. It lies
     inside the rail's own profile, so sliders still slide on from below."""
     h = Y_FACE - y_base  # rack teeth start half a pitch up and are 45 deg already
-    prof = fuse([dovetail_profile(h), box(-BASE_W / 2, BASE_W / 2, -BASE_T, 0, 0, h)])
+    prof = fuse(_plain_rail(h))
     prof.translate(V(0, 0, -h))
     x0 = -BASE_W / 2 - 1
     pts = [V(x0, -BASE_T - 1, -h), V(x0, y_base, -h), V(x0, y_base + h, 0), V(x0, -BASE_T - 1, 0)]
@@ -104,13 +117,19 @@ def channel(y_back, y_in):
     return back + front
 
 
-def slider():
-    """Slider at z=0..SLIDER_L, sitting on a rail whose backing face is y=0."""
-    length, tongue_t = SLIDER_L, TONGUE_T
-    x_out = FLANGE_W / 2 + T_CLR + SIDE
+def guide(length=SLIDER_L):
+    """Guide slider at z=0..length: the slider body without tongue or tab
+    (channel, lead-ins, chamfers, grooves). It slides freely, keeping the top
+    of a tall mount from rocking; the locking slider at the mount's bottom
+    holds the position. slider() adds the tongue to it."""
+    x_out, y_out = X_OUT, Y_OUT
     y_back, y_in = CLR, Y_FACE + DEPTH + CLR
-    y_out = y_in + FRONT
     body = box(-x_out, x_out, y_back, y_out, 0, length)
+    # V grooves along both sides for mount shoes
+    for sx in (-1, 1):
+        g = [V(sx * (x_out + 0.01), GROOVE_Y - GROOVE_D - 0.01, -1), V(sx * (x_out - GROOVE_D), GROOVE_Y, -1),
+             V(sx * (x_out + 0.01), GROOVE_Y + GROOVE_D + 0.01, -1)]
+        body = body.cut(Part.Face(Part.makePolygon(g + [g[0]])).extrude(V(0, 0, length + 2)))
     half = channel(y_back, y_in)
     body = body.cut(prism(half, length + 2).translated(V(0, 0, -1)))
     # lead-in at both channel mouths
@@ -126,7 +145,17 @@ def slider():
                V(sx * (x_out + 1), y_out - EF - 1, -1)]
         body = body.cut(Part.Face(Part.makePolygon(pts + [pts[0]])).extrude(V(0, 0, length + 2)))
     pts = [V(-x_out - 1, y_out - EF, 0), V(-x_out - 1, y_out + 1, 0), V(-x_out - 1, y_out + 1, EF + 1)]
-    body = body.cut(Part.Face(Part.makePolygon(pts + [pts[0]])).extrude(V(2 * x_out + 2, 0, 0)))
+    return body.cut(Part.Face(Part.makePolygon(pts + [pts[0]])).extrude(V(2 * x_out + 2, 0, 0)))
+
+
+def slider():
+    """Locking slider at z=0..SLIDER_L, sitting on a rail whose backing face
+    is y=0. Its tab hangs below z=0, so it can be reached under a mount."""
+    length, tongue_t = SLIDER_L, TONGUE_T
+    x_out, y_out = X_OUT, Y_OUT
+    y_in = Y_FACE + DEPTH + CLR
+    body = guide(length)
+    # built tab-up, then mirrored end for end
     # free the tongue: side slots open at the top with round ends at the root
     hw = TONGUE_W / 2
     for sx in (-1, 1):
@@ -150,10 +179,11 @@ def slider():
     tw = x_out + TAB_WING
     ext = box(-hw, hw, y_out - tongue_t, y_out, length - 0.01, length + TAB_EXT)
     grip = box(-tw, tw, y_in, y_out, length + TAB_EXT - TAB_H, length + TAB_EXT)
-    return fuse([body, post, det, ext, grip])
+    return fuse([body, post, det, ext, grip]).mirror(V(0, 0, length / 2), V(0, 0, 1))
 
 
 def seat_offset():
-    """Slider z offset (from rail z=0) that seats its detent in a rack valley."""
-    k = int((SLIDER_L - PITCH) / PITCH) + 2
-    return k * PITCH - (SLIDER_L - PITCH)
+    """Lowest slider z (from rail z=0) that keeps its tab on the rail and
+    seats its detent in a rack valley. The detent sits whole pitches from
+    the slider ends, so any multiple of PITCH seats it."""
+    return math.ceil(TAB_EXT / PITCH) * PITCH

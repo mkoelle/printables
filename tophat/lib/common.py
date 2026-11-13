@@ -15,6 +15,7 @@ PROJECT = Path(__file__).resolve().parents[1]
 BUILD = PROJECT / "build"               # generated .FCStd models, not in git
 STL_PARTS = PROJECT / "stl" / "parts"   # the hat itself
 STL_TESTS = PROJECT / "stl" / "tests"   # test coupons
+STL_MOUNTS = PROJECT / "stl" / "mounts" # components for the rail sliders (mounts/)
 
 PLA = 1.24e-3  # g per mm3
 FLIP = (V(1, 0, 0), 180)  # turn for place(): upside down
