@@ -1,4 +1,4 @@
-"""Brim seam key for tophat_param.py (PLA).
+"""Brim seam key for models/hat.py (PLA).
 
 Seam frame: X = radial along the seam (X=0 at the hat axis), Y = across it,
 Z up. The tongue belongs to the piece at Y < 0 and enters the piece at

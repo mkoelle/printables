@@ -1,0 +1,14 @@
+# Repo-wide tasks. Each project's own tasks are in <project>/mise.toml; run
+# them from that folder (mise run build) or through these.
+
+[settings]
+# FreeCAD runs one script at a time; tools/fc.py also locks.
+jobs = 1
+
+[tasks.build]
+description = "Build every project, skipping steps whose inputs did not change"
+run = "mise run -C tophat build"
+
+[tasks.status]
+description = "Check that FreeCAD's RPC server is reachable"
+run = "python3 tools/fc.py --status"

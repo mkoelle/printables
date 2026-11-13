@@ -3,37 +3,52 @@
 Read `README.md` first (parts, files, decisions, status) and `TESTING.md`
 (test prints). This file covers how to work on the code.
 
+## Layout
+
+- `models/`: the scripts you run, one per build step: `hat.py` (the
+  `TopHat` model), `export.py` (hat STLs), `cage.py`, `tests.py`, and
+  `build_all.py` (all four in order).
+- `lib/`: imported only. `common.py` (project paths, `open_model` /
+  `new_model` / `save_model`, shapes, `reader`, `place` / `write_stl` for
+  print orientation and export, `grams`, checks), `seam.py` (brim seam
+  key), `rail.py` (rails and sliders). Each script in `models/` puts `lib/`
+  first on `sys.path` and reloads these.
+- `build/`: generated `.FCStd` models and FreeCAD's `.FCBak` backups, not in
+  git. `stl/parts/`: the hat. `stl/tests/`: test coupons.
+- Paths come from each script's own `__file__` (`common.PROJECT`), so the
+  repo can live anywhere. A script must run with `__file__` set (see below).
+
 ## Running the scripts
 
-- All scripts run inside the FreeCAD GUI (FreeCAD 1.1, macOS), not plain Python.
-- Use the `freecad` MCP server's `execute_code` tool:
-  `exec(open("/Users/mkoelle/src/github.com/mkoelle/printables/tophat/<script>.py").read())`.
-  Pass `timeout` 600-1800 for cage and test builds; pass
-  `include_screenshot: false` unless you need to see the model.
-- If MCP tools are not loaded, the addon's XML-RPC server on `localhost:9875`
-  takes the same call:
-  `xmlrpc.client.ServerProxy("http://localhost:9875").execute_code(src)`.
-  FreeCAD must be running with the MCP addon's RPC server started.
-- Rebuild order: `tophat_param.py` -> save `TopHat.FCStd` -> `export_stl.py`
-  -> `cage.py` -> `test_kit.py`. `build_all.py` does all of it in about
-  10 minutes (model 3.5, export 2, cage 2, tests 2). That can outlast one
-  MCP call, so run the steps as separate calls.
-- Rebuild only what a change touches. `cage.py`: only when the crown, lip,
-  head or `rail.py` changes. `test_kit.py`: set `TEST_GROUPS` (any of
-  "fit", "fixtures", "rail") in the same `execute_code` call before the
-  `exec`; fixtures alone take about 1 minute. `build_all.py` takes
-  `BUILD_STEPS` the same way.
-- The `.FCStd` models are generated and not in git (`.gitignore`). After a
-  fresh clone, run `build_all.py` before `cage.py` or `test_kit.py`.
-- `tophat_param.py` is the single source of truth: it recreates `TopHat`
-  from its parameter lists and builds every part as a plain `Part::Feature`
-  shape, so spreadsheet edits do nothing. The documents keep only the
-  finished parts (`Crown`, `CrownCut`, `CageLip`, `BrimRing`,
-  `BrimQ<n>`), which the other scripts read.
-- Shared code: `common.py` (shapes, `reader`, `place` / `write_stl` for
-  print orientation and export, `grams`, checks), `seam.py` (brim seam
-  key), `rail.py` (rails and sliders). Each script puts the folder on
-  `sys.path` and reloads them.
+- All scripts run inside the FreeCAD GUI (FreeCAD 1.1, macOS), not plain
+  Python. FreeCAD must be open with the MCP addon's RPC server started.
+- Build with mise from `tophat/`. Each task runs one script through
+  `../tools/fc.py` and is skipped when its outputs are newer than its
+  sources:
+  - `mise run build`: everything that changed (all steps after a clone,
+    about 10 minutes: hat 3.5, export 2, cage 2, tests 2)
+  - `mise run hat`, `export`, `cage`, `tests`: one step, after any step it
+    depends on that is out of date. `mise run -f --skip-deps <step>`
+    reruns only that step (`-f` alone forces its dependencies too)
+  - `mise run tests --groups fixtures`: only some test groups (`fit`,
+    `fixtures`, `rail`); fixtures alone take about 1 minute
+- Run builds through mise (or `python3 ../tools/fc.py models/<script>.py`),
+  not through MCP `execute_code`. `fc.py` takes a lock so two builds never
+  run in FreeCAD at once, and exits non-zero on an error or failed check.
+  A long build can outlast the Bash tool's timeout: run it in the
+  background.
+- Use MCP `execute_code` only to inspect models. To run a script there, set
+  `__file__`: `p = ".../tophat/models/<script>.py"; exec(open(p).read(),
+  {"__file__": p})`. Pass `include_screenshot: false` unless you need to see
+  the model.
+- `models/hat.py` is the single source of truth: it recreates `TopHat`
+  from its parameter lists, builds every part as a plain `Part::Feature`
+  shape and saves `build/TopHat.FCStd`, so spreadsheet edits do nothing.
+  The documents keep only the finished parts (`Crown`, `CrownCut`,
+  `CageLip`, `BrimRing`, `BrimQ<n>`), which the other scripts read.
+- When you add an input to a script (a new `lib/` module, another model),
+  add it to that task's `sources` in `mise.toml`, or edits to it will not
+  trigger a rebuild.
 
 ## Verifying a change
 
@@ -67,9 +82,9 @@ overlaps, wedge-lip press, rail head clearance). Record new pass/fail conditions
 
 - Units mm. X = front/back (long head axis), Y = sides, Z up from the brim
   underside. Ellipse parameter `t` (degrees) places features round the oval.
-- New dimensions go in the parameter lists in `tophat_param.py` as Main,
+- New dimensions go in the parameter lists in `models/hat.py` as Main,
   Advanced (formula) or Derived, with a note.
 - Print orientation is set at export with `common.place`: crown flipped,
   wide oval parts turned 45 deg, brim pieces stood on their socket seam
   face, sliders front-down (tongue on the bed).
-- `.FCBak` files are FreeCAD's automatic backups.
+- `build/*.FCBak` files are FreeCAD's automatic backups.

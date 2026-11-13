@@ -15,32 +15,33 @@ centre. Rails stop HeadGap above that dome, measured at a seated slider's
 inner face, so they reach lower than HeadClear at the sides. The model
 includes the head dome (transparent) for reference.
 
-Re-run after changing Params. Writes stl/tophat_cage_fingers.stl.
+Re-run after changing Params. Writes build/CageFingers.FCStd and
+stl/parts/tophat_cage_fingers.stl.
 """
-import math
-import os
-import sys
 import importlib
+import math
+import sys
+from pathlib import Path
 import FreeCAD as App
 import Part
 from FreeCAD import Vector as V
 
-DIR = os.path.expanduser("~/src/github.com/mkoelle/printables/tophat")
-sys.path.insert(0, DIR)
+LIB = str(Path(__file__).resolve().parents[1] / "lib")
+if LIB in sys.path:
+    sys.path.remove(LIB)
+sys.path.insert(0, LIB)  # first, so these modules win over other projects'
 import common
 import rail
 importlib.reload(common)
 importlib.reload(rail)
-from common import box, check, ellipse, fuse, loft, oval, place, size, turn, write_stl
+from common import STL_PARTS, box, check, ellipse, fuse, loft, oval, place, size, turn, write_stl
 
 RAIL_COUNT = 6                     # 6: front, back + 4 at 60 deg steps
 RAIL_T = [k * 360 / RAIL_COUNT for k in range(RAIL_COUNT)]  # ellipse parameters
 FINGER_W = rail.BASE_W + 8         # finger width
 BEVEL_D, BEVEL_H = 0.5, 1.0        # finger tip inner bevel: depth, height
 
-if "TopHat" not in App.listDocuments():
-    App.openDocument(os.path.join(DIR, "TopHat.FCStd"))
-hat = App.getDocument("TopHat")
+hat = common.open_model("TopHat")
 val = common.reader(hat.Params)
 BED, BED_H = val("Bed"), val("BedH")
 CA, CB, Clr, T = val("CA"), val("CB"), val("Clr"), val("CageT")
@@ -197,9 +198,7 @@ print(f"  finger tip squeeze to insert {finger_squeeze():.1f} mm, "
 
 # --- Models + export -------------------------------------------------------
 def save_model(model, parts):
-    if model in App.listDocuments():
-        App.closeDocument(model)
-    doc = App.newDocument(model)
+    doc = common.new_model(model)
     for name, s, color in parts + [("HeadDome", head_shape, (0.85, 0.7, 0.6))]:
         o = doc.addObject("Part::Feature", name)
         o.Shape = s
@@ -207,16 +206,11 @@ def save_model(model, parts):
             o.ViewObject.ShapeColor = color
             if name == "HeadDome":
                 o.ViewObject.Transparency = 75
-    doc.recompute()
-    if App.GuiUp:
-        import FreeCADGui as Gui
-        Gui.activeDocument().activeView().viewIsometric()
-        Gui.SendMsgToActiveView("ViewFit")
-    doc.saveAs(os.path.join(DIR, f"{model}.FCStd"))
+    common.save_model(doc)
 
 
 save_model("CageFingers", [("CageFingers", fingers, (0.2, 0.45, 0.75))])
-bb = write_stl(place(fingers, turn(45)), os.path.join(DIR, "stl", "tophat_cage_fingers.stl"),
+bb = write_stl(place(fingers, turn(45)), STL_PARTS / "tophat_cage_fingers.stl",
                "CageFingers", BED, BED_H)
 print(f"  stl fingers: {size(bb)}")
 common.summary("cage")

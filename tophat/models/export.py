@@ -1,25 +1,25 @@
-"""Export print-ready STLs from the open TopHat document.
+"""Export print-ready STLs of the hat from build/TopHat.FCStd.
 
 Each part is placed for the printer in Params (Bed, BedH): lowest point at
 z=0, centred on the origin. Crown is flipped (top on bed) and turned 45 deg
 so its long oval fits the bed diagonal; each brim segment stands on end on
 its socket seam face (use a slicer plate brim, and slicer supports under the
-curl). Writes to <document folder>/stl/.
+curl). Writes to stl/parts/.
 """
 import importlib
-import os
 import sys
-import FreeCAD as App
+from pathlib import Path
 from FreeCAD import Vector as V
 
-sys.path.insert(0, os.path.expanduser("~/src/github.com/mkoelle/printables/tophat"))
+LIB = str(Path(__file__).resolve().parents[1] / "lib")
+if LIB in sys.path:
+    sys.path.remove(LIB)
+sys.path.insert(0, LIB)  # first, so these modules win over other projects'
 import common
 importlib.reload(common)
-from common import FLIP, place, size, turn, write_stl
+from common import FLIP, STL_PARTS, place, size, turn, write_stl
 
-doc = App.getDocument("TopHat")
-out = os.path.join(os.path.dirname(doc.FileName), "stl")
-os.makedirs(out, exist_ok=True)
+doc = common.open_model("TopHat")
 BED, BED_H = doc.Params.Bed.Value, doc.Params.BedH.Value
 SEGS = int(doc.Params.BrimSegs)
 
@@ -29,7 +29,7 @@ jobs = [("Crown", (FLIP, turn(45)))] + \
        [(f"BrimQ{q}", (turn(-(q - 1) * 360 / SEGS), (V(1, 0, 0), 90))) for q in range(1, SEGS + 1)]
 for name, turns in jobs:
     s = place(doc.getObject(name).Shape, *turns)
-    path = os.path.join(out, f"tophat_{name.lower()}.stl")
+    path = STL_PARTS / f"tophat_{name.lower()}.stl"
     bb = write_stl(s, path, name, BED, BED_H)
-    print(f"{name}: {size(bb)} -> {path}")
-common.summary("export_stl")
+    print(f"{name}: {size(bb)} -> {path.relative_to(common.PROJECT)}")
+common.summary("export")

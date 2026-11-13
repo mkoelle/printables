@@ -1,0 +1,37 @@
+# Top hat build steps. Each runs one script in models/ inside the open
+# FreeCAD (via ../tools/fc.py) and is skipped when its outputs are newer than
+# its sources. `mise run cage` also runs what cage depends on (hat) when that
+# is out of date. Force one step alone: `mise run -f --skip-deps cage`.
+
+[tasks.hat]
+description = "TopHat model from the parameter lists in models/hat.py"
+sources = ["models/hat.py", "lib/common.py", "lib/seam.py"]
+outputs = ["build/TopHat.FCStd"]
+run = "python3 ../tools/fc.py models/hat.py"
+
+[tasks.export]
+description = "Crown and brim STLs"
+depends = ["hat"]
+sources = ["models/export.py", "lib/common.py", "build/TopHat.FCStd"]
+outputs = ["stl/parts/tophat_crown.stl", "stl/parts/tophat_brimq1.stl"]
+run = "python3 ../tools/fc.py models/export.py"
+
+[tasks.cage]
+description = "CageFingers model and STL"
+depends = ["hat"]
+sources = ["models/cage.py", "lib/common.py", "lib/rail.py", "build/TopHat.FCStd"]
+outputs = ["build/CageFingers.FCStd", "stl/parts/tophat_cage_fingers.stl"]
+run = "python3 ../tools/fc.py models/cage.py"
+
+[tasks.tests]
+description = "Test models and STLs (--groups fit,fixtures,rail)"
+depends = ["hat", "cage"]
+sources = ["models/tests.py", "lib/common.py", "lib/rail.py",
+           "build/TopHat.FCStd", "build/CageFingers.FCStd"]
+outputs = ["build/TopHatFitTests.FCStd", "build/FixtureTests.FCStd", "build/RailTests.FCStd"]
+usage = 'flag "--groups <groups>" default="fit,fixtures,rail" help="Comma-separated test groups to rebuild"'
+run = "python3 ../tools/fc.py models/tests.py TEST_GROUPS=${usage_groups}"
+
+[tasks.build]
+description = "Build the whole hat, skipping steps whose inputs did not change"
+depends = ["export", "cage", "tests"]

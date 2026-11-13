@@ -1,8 +1,8 @@
 # Top hat tests
 
 Print these in PLA before printing the full hat. Re-generate them with
-`test_kit.py` (run inside FreeCAD) after changing any parameter or `rail.py`.
-STLs are in `stl/test_*.stl`.
+`models/tests.py` (`mise run tests`) after changing any parameter or `rail.py`.
+STLs are in `stl/tests/`.
 
 ## Print next
 
