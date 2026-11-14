@@ -1,7 +1,8 @@
 """Build every component in mounts/ (one module each, see lib/mount.py):
 build/Mounts.FCStd with the parts in a row, and stl/mounts/mount_<part>.stl
-placed for printing. The model also shows the sliders each part snaps onto
-(<part>_sliders, see-through); they print separately (stl/tests/). Each part must be a valid single solid that fits the
+placed for printing, plus the sliders every component stands on
+(mount_slider.stl, mount_guide.stl). The model also shows the sliders each
+part snaps onto (<part>_sliders, see-through). Each part must be a valid single solid that fits the
 printer. Re-run after changing a mount, mount.py or rail.py.
 """
 import importlib
@@ -60,5 +61,16 @@ for name in mount.catalogue():
             guide = len(mount.slider_set(h)) > 1
             print(f"{part}: valid {shape.isValid()} solids {len(shape.Solids)} {size(bb)} "
                   f"{common.grams(shape):.0f} g, {'lock + guide' if guide else 'lock'} slider - {mod.PURPOSE}")
+# the sliders themselves, front face down like the rail test coupons
+for part, shape in (("slider", rail.slider()), ("guide", rail.guide())):
+    s = place(shape, (V(1, 0, 0), -90))
+    check(shape.isValid() and len(shape.Solids) == 1, f"{part} valid single solid")
+    bb = write_stl(s, STL_MOUNTS / f"mount_{part}.stl", part, BED, BED_H, deflection=0.02)
+    o = doc.addObject("Part::Feature", part)
+    o.Shape = s
+    o.Placement = App.Placement(V(x + bb.XLength / 2, 0, 0), App.Rotation()).multiply(o.Placement)
+    x += bb.XLength + 15
+    print(f"{part}: {size(bb)} {common.grams(shape):.1f} g - one per component"
+          + (" (locking, at its bottom)" if part == "slider" else " (at the top of tall ones)"))
 common.save_model(doc)
 common.summary("mounts")
