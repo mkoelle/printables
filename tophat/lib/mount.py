@@ -26,6 +26,7 @@ A component is a module in mounts/ with:
 val reads TopHat's Params; opts come from VARIANTS or the layout entry.
 """
 import importlib.util
+import math
 import sys
 from pathlib import Path
 
@@ -101,6 +102,31 @@ def base(h=rail.SLIDER_L, upside_down=False):
         parts.append(cheek)
         parts += [_ridge(sx, z, z + rail.SLIDER_L) for z, _ in slider_set(h)]
     return fuse(parts)
+
+
+def lattice(x_out, z0, z1, thick, cell=8.0, rib=1.6):
+    """Cutter for a staggered diamond lattice in a plate behind the mount
+    face (y from Y_PLATE, `thick` deep), either side of the base: from
+    HALF_W + rib out to x_out, z0 to z1. 45 deg ribs `rib` wide on a `cell`
+    pitch print without support and keep the plate stiff; leave solid
+    borders by choosing x_out, z0 and z1 inside them."""
+    d = (cell - rib * math.sqrt(2)) / 2       # diamond half-diagonal
+    cuts = []
+    for sx in (-1, 1):
+        x0, x1 = sorted((sx * (HALF_W + rib), sx * x_out))
+        if x1 - x0 < 2 * d or z1 - z0 < 2 * d:
+            continue
+        nx = int((x1 - x0 - 2 * d) // (cell / 2))
+        xa = (x0 + x1) / 2 - nx * cell / 4    # centre the columns
+        for i in range(nx + 1):
+            for j in range(int((z1 - z0 - 2 * d) // (cell / 2)) + 1):
+                if (i + j) % 2:
+                    continue
+                xc, zc = xa + i * cell / 2, z0 + d + j * cell / 2
+                pts = [V(xc - d, Y_PLATE - 1, zc), V(xc, Y_PLATE - 1, zc - d),
+                       V(xc + d, Y_PLATE - 1, zc), V(xc, Y_PLATE - 1, zc + d)]
+                cuts.append(Part.Face(Part.makePolygon(pts + [pts[0]])).extrude(V(0, thick + 2, 0)))
+    return Part.makeCompound(cuts)
 
 
 def slider_z(step):

@@ -11,8 +11,6 @@ plus a guide slider at the top when it is mount.GUIDE_MIN or longer. One
 locking slider holds about 50 g. Prints standing on its ledge end; every
 feature is prismatic along the rail or has a 45 deg underside.
 """
-import math
-
 import Part
 from FreeCAD import Vector as V
 
@@ -31,8 +29,7 @@ HOOK_H = 6.0       # hook height from the plate face
 HOOK_T = 1.6       # stem and lip thickness
 LIP = 2.0          # lip reach outward past the plate edge
 CELL = 8.0         # lattice pitch (diamond centre to centre, along a row)
-RIB = 1.6          # lattice rib width (4 lines)
-BORDER = RIB       # solid edge round the lattice
+RIB = 1.6          # lattice rib width (4 lines), also its solid border
 
 
 def base_height(val, w=60, l=90, **opts):
@@ -62,31 +59,6 @@ def _hook(sx, x_edge, zc):
     return h.cut(wedge)
 
 
-def _windows(hw, l):
-    """Staggered diamond lattice in the plate either side of the base: 45 deg
-    ribs RIB wide on a CELL pitch, which print without support and keep the
-    plate stiff. A solid BORDER stays along the hooks, the ledge and the top,
-    and the strip behind the base stays solid."""
-    d = (CELL - RIB * math.sqrt(2)) / 2       # diamond half-diagonal
-    z0, z1 = LEDGE_T + BORDER, l - BORDER
-    cuts = []
-    for sx in (-1, 1):
-        x0, x1 = sorted((sx * (mount.HALF_W + BORDER), sx * (hw - HOOK_T - BORDER)))
-        if x1 - x0 < 2 * d:
-            continue
-        nx = int((x1 - x0 - 2 * d) // (CELL / 2))
-        xa = (x0 + x1) / 2 - nx * CELL / 4    # centre the columns
-        for i in range(nx + 1):
-            for j in range(int((z1 - z0 - 2 * d) // (CELL / 2)) + 1):
-                if (i + j) % 2:
-                    continue
-                xc, zc = xa + i * CELL / 2, z0 + d + j * CELL / 2
-                pts = [V(xc - d, mount.Y_PLATE - 1, zc), V(xc, mount.Y_PLATE - 1, zc - d),
-                       V(xc + d, mount.Y_PLATE - 1, zc), V(xc, mount.Y_PLATE - 1, zc + d)]
-                cuts.append(Part.Face(Part.makePolygon(pts + [pts[0]])).extrude(V(0, PLATE_T + 2, 0)))
-    return Part.makeCompound(cuts)
-
-
 def name(w=60, l=90, **opts):
     return f"sled_{w:g}x{l:g}"
 
@@ -94,7 +66,8 @@ def name(w=60, l=90, **opts):
 def parts(val, w=60, l=90, **opts):
     hw = max(w / 2, mount.HALF_W)
     yf = face()
-    plate = box(-hw, hw, mount.Y_PLATE, yf, 0, l).cut(_windows(hw, l))
+    plate = box(-hw, hw, mount.Y_PLATE, yf, 0, l).cut(
+        mount.lattice(hw - HOOK_T - RIB, LEDGE_T + RIB, l - RIB, PLATE_T, CELL, RIB))
     ledge = box(-hw, hw, yf - 0.01, yf + LEDGE, 0, LEDGE_T)
     hooks = []
     k = int((l - LEDGE_T - HOOK_H - HOOK_W) // HOOK_PITCH)  # hooks per side

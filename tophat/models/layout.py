@@ -28,7 +28,7 @@ importlib.reload(mount)
 from common import check
 
 LAYOUT = [
-    ("breadboard", 60, 20, {}),
+    ("breadboard", 60, 7, dict(size="half")),
     ("sled", 300, 6, dict(w=60, l=90, item=(45, 70, 12, 40))),
     ("bottle", 180, 29, {}),
 ]

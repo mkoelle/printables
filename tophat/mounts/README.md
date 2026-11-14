@@ -7,10 +7,10 @@ places them on the rails and checks that everything fits.
 
 | Component | Part(s) | Purpose | Sliders | Status |
 |-----------|---------|---------|---------|--------|
-| `breadboard.py` | `breadboard` | Pocket for a mini breadboard (170 tie-points, 35 x 47 x 8.5 mm); its adhesive back sticks to the floor | lock + guide | Designed, not printed |
-| `sled.py` | `sled_40x60`, `sled_60x90`, `sled_80x110` | Plate with a bottom ledge and rubber-band hooks on both sides; stand an item on the ledge and strap it on. Any size: add it to `VARIANTS` | lock, + guide from 36 mm long | Designed, not printed |
-| `bottle.py` | `bottle` | C ring a bottle cap snaps into from the side; the cap's lip rests on the ring, flush under the crown top, and the bottle hangs below. Defaults: cap 23 x 15 mm, lip 25 x 8 mm, bottle 33 mm across; sizes are layout options | lock + guide | Designed, not printed |
-| (`lib/rail.py`) | `slider`, `guide` | The sliders components stand on: one locking `slider` each, plus a `guide` for any 36 mm or taller (all current ones) | - | Slider: tongue tested in round 3, grooves and bottom tab not yet |
+| `breadboard.py` | `breadboard_mini`, `breadboard_half` | Pocket for a breadboard, held by snap clips over its side edges (no glue), on a lattice floor. mini: 170 tie-points, 47 x 35 mm. half: 400 tie-points (half size), 84 x 55 mm, which also fits 82-83.5 x 54-55 mm boards. Board thickness 9.3 mm with adhesive foam; set `board_h` for others (8.5 mm bare) | lock + guide | half printed 2026-11-14, not yet tested; mini designed |
+| `sled.py` | `sled_40x60`, `sled_60x90`, `sled_80x110` | Plate with a bottom ledge and rubber-band hooks on both sides; stand an item on the ledge and strap it on. Any size: add it to `VARIANTS` | lock, + guide from 36 mm long | 80x110 printed 2026-11-14, not yet tested |
+| `bottle.py` | `bottle` | C ring a bottle cap snaps into from the side; the cap's lip rests on the ring, flush under the crown top, and the bottle hangs below. Defaults: cap 23 x 15 mm, lip 25 x 8 mm, bottle 33 mm across; sizes are layout options | lock + guide | 2 printed 2026-11-14, not yet tested |
+| (`lib/rail.py`) | `slider`, `guide` | The sliders components stand on: one locking `slider` each, plus a `guide` for any 36 mm or taller (all current ones) | - | 4 of each printed 2026-11-14; grooves, bottom tab and guide not yet tested |
 
 ## How a component attaches
 
