@@ -30,6 +30,7 @@ from common import check
 LAYOUT = [
     ("breadboard", 60, 20, {}),
     ("sled", 300, 6, dict(w=60, l=90, item=(45, 70, 12, 40))),
+    ("bottle", 180, 29, {}),
 ]
 
 hat = common.open_model("TopHat")
@@ -55,7 +56,10 @@ for name, t, step, opts in LAYOUT:
         p = mount.to_hat(shape, frame, step)
         items.append((f"{tag} {part}", p, common.grams(p), (0.2, 0.6, 0.3)))
     for label, shape, grams in mod.payload(val, **opts):
-        items.append((f"{tag} {label}", mount.to_hat(shape, frame, step), grams, (0.9, 0.7, 0.2)))
+        p = mount.to_hat(shape, frame, step)
+        items.append((f"{tag} {label}", p, grams, (0.9, 0.7, 0.2)))
+        gap = val("CrownH") - val("CapT") - p.optimalBoundingBox().ZMax
+        print(f"  {label}: {grams:.0f} g, top {gap:.1f} mm under the crown top")
 
 
 def overlap(a, b):

@@ -9,6 +9,7 @@ places them on the rails and checks that everything fits.
 |-----------|---------|---------|---------|--------|
 | `breadboard.py` | `breadboard` | Pocket for a mini breadboard (170 tie-points, 35 x 47 x 8.5 mm); its adhesive back sticks to the floor | lock + guide | Designed, not printed |
 | `sled.py` | `sled_40x60`, `sled_60x90`, `sled_80x110` | Plate with a bottom ledge and rubber-band hooks on both sides; stand an item on the ledge and strap it on. Any size: add it to `VARIANTS` | lock, + guide from 36 mm long | Designed, not printed |
+| `bottle.py` | `bottle` | C ring a bottle cap snaps into from the side; the cap's lip rests on the ring, flush under the crown top, and the bottle hangs below. Defaults: cap 23 x 15 mm, lip 25 x 8 mm, bottle 33 mm across; sizes are layout options | lock + guide | Designed, not printed |
 
 ## How a component attaches
 
@@ -63,5 +64,9 @@ Then add a row here and an entry to `LAYOUT` in `models/layout.py`, and run
 - **Too big for one rail:** a 150 x 75 x 14 mm power bank. It only fits
   lying flat under the crown top, across the front and back rails, which
   needs a part that spans two rails (not designed yet).
+- **Bottle:** at the top of the back rail (step 29), the lip sits 0.3 mm
+  under the crown top. Bottles up to about 65 mm below the cap clear the
+  head; 67 mm does not. Mind the weight: 60 g with liquid is above what one
+  locking slider holds (about 50 g), so test it.
 - **Balance:** `layout.py` prints the centre of mass of everything on the
   rails. Keep it near the axis, for example heavy items on opposite rails.

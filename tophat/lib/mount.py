@@ -75,9 +75,10 @@ def _ridge(sx, z0, z1):
     return Part.Face(Part.makePolygon(pts + [pts[0]])).extrude(V(0, 0, z1 - z0))
 
 
-def base(h=rail.SLIDER_L):
+def base(h=rail.SLIDER_L, upside_down=False):
     """Plate and cheeks from z=0 to h (at least one slider long), with snap
-    ridges over each slider (slider_set)."""
+    ridges over each slider (slider_set). upside_down: for a part printed top
+    down, the cheek cut's 45 deg edge goes at its bottom."""
     parts = [box(-HALF_W, HALF_W, Y_PLATE, Y_MOUNT, 0, h)]
     zs = slider_set(h)
     for sx in (-1, 1):
@@ -90,8 +91,12 @@ def base(h=rail.SLIDER_L):
             ys = Y_PLATE - CUT_KEEP
             rise = ys - Y_TIP + 1
             if zb - rise > za:
-                pts = [V(x0 - 1, Y_TIP - 1, za), V(x0 - 1, ys, za), V(x0 - 1, ys, zb - rise),
-                       V(x0 - 1, Y_TIP - 1, zb)]
+                if upside_down:
+                    pts = [V(x0 - 1, Y_TIP - 1, za), V(x0 - 1, ys, za + rise), V(x0 - 1, ys, zb),
+                           V(x0 - 1, Y_TIP - 1, zb)]
+                else:
+                    pts = [V(x0 - 1, Y_TIP - 1, za), V(x0 - 1, ys, za), V(x0 - 1, ys, zb - rise),
+                           V(x0 - 1, Y_TIP - 1, zb)]
                 cheek = cheek.cut(Part.Face(Part.makePolygon(pts + [pts[0]])).extrude(V(x1 - x0 + 2, 0, 0)))
         parts.append(cheek)
         parts += [_ridge(sx, z, z + rail.SLIDER_L) for z, _ in slider_set(h)]
